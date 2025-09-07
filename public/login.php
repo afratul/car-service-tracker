@@ -1,11 +1,25 @@
 <?php
 require_once __DIR__ . '/../app/auth.php';
+require_once __DIR__ . '/../app/db.php';
 require_once __DIR__ . '/../app/config.php';
 
 $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = strtolower(trim($_POST['email'] ?? ''));
     $pass  = $_POST['password'] ?? '';
+
+    // Check if the account exists and whether it's verified
+    $stmt = db()->prepare("SELECT id, email_verified FROM users WHERE email = ?");
+    $stmt->execute([$email]);
+    $u = $stmt->fetch();
+
+    if ($u && (int)$u['email_verified'] === 0) {
+        // Not verified → send to verification page
+        header('Location: verify.php?email=' . urlencode($email));
+        exit;
+    }
+
+    // Proceed with normal login
     if (login($email, $pass)) {
         header('Location: dashboard.php');
         exit;

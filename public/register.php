@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/../app/db.php';
 require_once __DIR__ . '/../app/config.php';
+require_once __DIR__ . '/../app/mail.php';
+
 
 $errors = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -13,17 +15,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Valid email is required';
     if (strlen($pass) < 6) $errors[] = 'Password must be at least 6 characters';
 
-    if (!$errors) {
-        try {
-            $stmt = db()->prepare("INSERT INTO users (name,email,password_hash,role) VALUES (?,?,?,?)");
-            $stmt->execute([$name, $email, password_hash($pass, PASSWORD_DEFAULT), $role]);
-            header('Location: login.php?registered=1');
+   if (!$errors) {
+    try {
+        // 1) Create the user
+        $stmt = db()->prepare("INSERT INTO users (name,email,password_hash,role) VALUES (?,?,?,?)");
+        $stmt->execute([$name, $email, password_hash($pass, PASSWORD_DEFAULT), $role]);
+
+        // 2) Generate a 6-digit OTP and expiry (15 minutes)
+        $otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $expires = (new DateTime('+15 minutes'))->format('Y-m-d H:i:s');
+
+        // 3) Store OTP on the user
+        db()->prepare("UPDATE users SET email_verification_code=?, email_verification_expires=? WHERE email=?")
+           ->execute([$otp, $expires, $email]);
+
+        // 4) Send the verification email
+        $html = "<p>Hi " . htmlspecialchars($name) . ",</p>
+                 <p>Your verification code is <strong style='font-size:18px;'>{$otp}</strong>.</p>
+                 <p>It expires in 15 minutes.</p>
+                 <p>Verify here: <a href='verify.php?email=" . urlencode($email) . "'>Verify Email</a></p>";
+
+        $sent = send_mail($email, $name, 'Verify your email (Car Service Tracker)', $html);
+
+        // 5) Redirect to verification page if email sent, otherwise show error
+        if ($sent === true) {
+            header('Location: verify.php?email=' . urlencode($email));
             exit;
-        } catch (PDOException $e) {
-            if ($e->errorInfo[1] === 1062) $errors[] = 'Email already exists';
-            else throw $e;
+        } else {
+            $errors[] = 'Could not send verification email. ' . $sent;
+        }
+
+    } catch (PDOException $e) {
+        if (!empty($e->errorInfo[1]) && $e->errorInfo[1] === 1062) {
+            $errors[] = 'Email already exists';
+        } else {
+            throw $e;
         }
     }
+}
 }
 include __DIR__ . '/../templates/header.php';
 ?>
