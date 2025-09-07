@@ -45,7 +45,8 @@ include __DIR__ . '/../templates/header.php';
   <a class="btn btn-sm btn-outline-secondary" href="vehicle_form.php?id=<?=$v['id']?>">Edit</a>
   <form method="post" class="d-inline" onsubmit="return confirm('Delete this vehicle?');">
     <input type="hidden" name="delete_id" value="<?=$v['id']?>">
-    <button class="btn btn-sm btn-outline-danger">Delete</button>
+   <button class="btn btn-sm btn-danger">Delete</button>
+
   </form>
 </td>
 

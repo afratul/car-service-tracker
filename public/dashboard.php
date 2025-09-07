@@ -42,9 +42,13 @@ $recent = db()->prepare("
 $recent->execute([$user['id']]);
 $recentRows = $recent->fetchAll();
 
-// --- Engine oil change alerts (simple rule) ---
-$OIL_MILEAGE_INTERVAL = 5000;   // km
-$OIL_TIME_INTERVAL_DAYS = 180;  // about 6 months
+// --- Engine oil change alerts (oil-type-specific rules) ---
+$OIL_RULES = [
+  'Mineral'         => ['km' => 2500, 'days' => 90],   // 3 months or 2500 km
+  'Semi synthetic'  => ['km' => 3500, 'days' => 180],  // 6 months or 3500 km
+  'Full synthetic'  => ['km' => 5000, 'days' => 180],  // 6 months or 5000 km
+  '_default'        => ['km' => 5000, 'days' => 180],  // fallback if oil_type is NULL/unknown
+];
 
 // Load user's vehicles with their current mileage
 $vehStmt = db()->prepare("SELECT id, reg_no, current_mileage FROM vehicles WHERE user_id=? ORDER BY id ASC");
@@ -55,9 +59,9 @@ $alerts = [];
 $today = new DateTime();
 
 foreach ($userVehicles as $v) {
-    // most recent engine oil change for this vehicle
+    // most recent engine oil change for this vehicle (now also fetching oil_type)
     $lastOil = db()->prepare("
-        SELECT service_date, mileage
+        SELECT service_date, mileage, oil_type
         FROM services
         WHERE vehicle_id=? AND type='Engine oil change'
         ORDER BY service_date DESC, id DESC
@@ -66,26 +70,34 @@ foreach ($userVehicles as $v) {
     $lastOil->execute([$v['id']]);
     $row = $lastOil->fetch();
 
+    $oilType   = $row['oil_type'] ?? null;
+    $rule      = $OIL_RULES[$oilType] ?? $OIL_RULES['_default'];
+
     $lastMileage = $row ? (int)$row['mileage'] : 0;
-    $lastDate    = $row ? new DateTime($row['service_date']) : null;
+    $lastDate    = $row && !empty($row['service_date']) ? new DateTime($row['service_date']) : null;
 
     $sinceMileage = max(0, (int)$v['current_mileage'] - $lastMileage);
     $sinceDays    = $lastDate ? $today->diff($lastDate)->days : null;
 
-    $dueByMileage = ($sinceMileage >= $OIL_MILEAGE_INTERVAL);
-    $dueByTime    = ($sinceDays !== null && $sinceDays >= $OIL_TIME_INTERVAL_DAYS);
+    $dueByMileage = ($sinceMileage >= $rule['km']);
+    $dueByTime    = ($sinceDays !== null && $sinceDays >= $rule['days']);
 
     if ($dueByMileage || $dueByTime) {
         $reason = [];
-        if ($dueByMileage) $reason[] = "{$sinceMileage} km since last oil change";
-        if ($dueByTime)    $reason[] = "{$sinceDays} days since last oil change";
+        // include oil type in the reason if we have it
+        if ($oilType) {
+            $reason[] = "Oil: $oilType";
+        }
+        if ($dueByMileage) $reason[] = "{$sinceMileage} km since last oil change (limit {$rule['km']} km)";
+        if ($dueByTime)    $reason[] = "{$sinceDays} days since last oil change (limit {$rule['days']} days)";
         $alerts[] = [
-            'reg_no' => $v['reg_no'],
-            'reason' => implode(' • ', $reason),
+            'reg_no'     => $v['reg_no'],
+            'reason'     => implode(' • ', $reason),
             'vehicle_id' => $v['id'],
         ];
     }
 }
+
 
 
 include __DIR__ . '/../templates/header.php';

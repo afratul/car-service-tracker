@@ -46,6 +46,10 @@ $SERVICE_TYPES = [
   ]
 ];
 
+// Oil types for engine oil change
+$OIL_TYPES = ['Mineral', 'Semi synthetic', 'Full synthetic'];
+
+
 $user = current_user();
 
 // Get user's vehicles for the dropdown
@@ -61,7 +65,9 @@ $service = [
   'type'         => '',
   'mileage'      => 0,
   'cost'         => '0.00',
-  'notes'        => ''
+  'notes'        => '',
+  'oil_type'     => ''   // only used when Type = Engine oil change
+
 ];
 
 // If a vehicle_id is provided in the URL, preselect it (only if it belongs to the user)
@@ -113,6 +119,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $service['mileage']      = (int)($_POST['mileage'] ?? 0);
   $service['cost']         = (string)($_POST['cost'] ?? '0');
   $service['notes']        = trim($_POST['notes'] ?? '');
+  $service['oil_type']     = trim($_POST['oil_type'] ?? '');
+
 
   // ensure the selected vehicle belongs to this user
   $own = db()->prepare("SELECT id FROM vehicles WHERE id=? AND user_id=?");
@@ -157,6 +165,16 @@ if ($previousMileage > 0 && (int)$service['mileage'] < $previousMileage) {
   if (!is_valid_service_type($SERVICE_TYPES, $service['type'])) {
     $errors[] = 'Please select a valid service type.';
 }
+// When engine oil change is selected, oil type is required and must be valid
+if ($service['type'] === 'Engine oil change') {
+    if (!in_array($service['oil_type'], $OIL_TYPES, true)) {
+        $errors[] = 'Please select the oil type for Engine oil change.';
+    }
+} else {
+    // For non-oil services, ignore any posted oil_type
+    $service['oil_type'] = '';
+}
+
 if ($service['type'] === 'Other' && $service['notes'] === '') {
     $errors[] = 'Please describe the service in Notes when choosing “Other”.';
 }
@@ -167,28 +185,32 @@ if ($service['type'] === 'Other' && $service['notes'] === '') {
   if (!$errors) {
   if ($id) {
     $sql = "UPDATE services 
-            SET vehicle_id=?, service_date=?, type=?, mileage=?, cost=?, notes=? 
-            WHERE id=?";
-    db()->prepare($sql)->execute([
-      $service['vehicle_id'],
-      $service['service_date'],
-      $service['type'],
-      $service['mileage'],
-      $service['cost'],
-      $service['notes'],
-      $id
-    ]);
+        SET vehicle_id=?, service_date=?, type=?, oil_type=?, mileage=?, cost=?, notes=? 
+        WHERE id=?";
+db()->prepare($sql)->execute([
+  $service['vehicle_id'],
+  $service['service_date'],
+  $service['type'],
+  ($service['type'] === 'Engine oil change' ? $service['oil_type'] : null),
+  $service['mileage'],
+  $service['cost'],
+  $service['notes'],
+  $id
+]);
+
   } else {
-    $sql = "INSERT INTO services (vehicle_id, service_date, type, mileage, cost, notes)
-            VALUES (?,?,?,?,?,?)";
-    db()->prepare($sql)->execute([
-      $service['vehicle_id'],
-      $service['service_date'],
-      $service['type'],
-      $service['mileage'],
-      $service['cost'],
-      $service['notes']
-    ]);
+    $sql = "INSERT INTO services (vehicle_id, service_date, type, oil_type, mileage, cost, notes)
+        VALUES (?,?,?,?,?,?,?)";
+db()->prepare($sql)->execute([
+  $service['vehicle_id'],
+  $service['service_date'],
+  $service['type'],
+  ($service['type'] === 'Engine oil change' ? $service['oil_type'] : null),
+  $service['mileage'],
+  $service['cost'],
+  $service['notes']
+]);
+
   }
 
   // bump vehicle mileage if this service mileage is higher
@@ -239,6 +261,18 @@ include __DIR__ . '/../templates/header.php';
   <div class="form-text">If you choose “Other”, describe it in Notes.</div>
 </div>
 
+<div class="col-md-4" id="oilTypeGroup" style="display:none;">
+  <label class="form-label">Oil type</label>
+  <select class="form-select" name="oil_type">
+    <option value="">-- Select oil type --</option>
+    <?php foreach ($OIL_TYPES as $ot): ?>
+      <option value="<?=$ot?>" <?=($service['oil_type']===$ot ? 'selected' : '')?>><?=$ot?></option>
+    <?php endforeach; ?>
+  </select>
+  <div class="form-text">Required for Engine oil change.</div>
+</div>
+
+
 
   <div class="col-md-4">
     <label class="form-label">Mileage</label>
@@ -275,5 +309,44 @@ document.addEventListener("DOMContentLoaded", function() {
   toggleNotesRequirement(); // run once on page load
 });
 </script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const typeSelect = document.querySelector('select[name="type"]');
+  const notes = document.querySelector('textarea[name="notes"]');
+  const oilGroup = document.getElementById('oilTypeGroup');
+  const oilSelect = document.querySelector('select[name="oil_type"]');
+
+  function toggleNotesRequirement() {
+    if (typeSelect.value === "Other") {
+      notes.setAttribute("required", "required");
+      // notes.focus(); // optional
+    } else {
+      notes.removeAttribute("required");
+    }
+  }
+
+  function toggleOilType() {
+    if (typeSelect.value === "Engine oil change") {
+      oilGroup.style.display = '';
+      oilSelect.setAttribute('required', 'required');
+    } else {
+      oilGroup.style.display = 'none';
+      oilSelect.removeAttribute('required');
+      oilSelect.value = '';
+    }
+  }
+
+  typeSelect.addEventListener("change", function() {
+    toggleNotesRequirement();
+    toggleOilType();
+  });
+
+  // run once on load (for edit mode and defaults)
+  toggleNotesRequirement();
+  toggleOilType();
+});
+</script>
+
 
 <?php include __DIR__ . '/../templates/footer.php'; ?>
