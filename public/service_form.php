@@ -64,6 +64,39 @@ $service = [
   'notes'        => ''
 ];
 
+// If a vehicle_id is provided in the URL, preselect it (only if it belongs to the user)
+if (isset($_GET['vehicle_id'])) {
+  $vid = (int)$_GET['vehicle_id'];
+  foreach ($vehicles as $v) {
+    if ((int)$v['id'] === $vid) {
+      $service['vehicle_id'] = $vid;
+      break;
+    }
+  }
+}
+
+
+$id = isset($_GET['id']) ? (int)$_GET['id'] : null;
+
+if ($id) {
+  // make sure the service belongs to this user
+  $st = db()->prepare("SELECT s.* 
+                       FROM services s 
+                       JOIN vehicles v ON s.vehicle_id = v.id 
+                       WHERE s.id=? AND v.user_id=?");
+  $st->execute([$id, $user['id']]);
+  $dbRow = $st->fetch();
+
+  if ($dbRow) {
+    $service = $dbRow; // overwrite defaults with DB values
+  } else {
+    // trying to edit someone else’s or non-existent → redirect back
+    header('Location: services.php');
+    exit;
+  }
+}
+
+
 // Validate selected service type against grouped options
 function is_valid_service_type(array $GROUPED, string $value): bool {
     foreach ($GROUPED as $group => $opts) {
@@ -86,6 +119,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $own->execute([$service['vehicle_id'], $user['id']]);
   if (!$own->fetch()) $errors[] = 'Invalid vehicle selection.';
 
+  // --- mileage rules: use previous if 0, and never allow decrease ---
+
+// 1) find the previous mileage for this vehicle:
+//    - max mileage from existing services (excluding current row if editing)
+//    - if none, fall back to vehicle's current_mileage
+if (isset($id) && $id) {
+    $prevStmt = db()->prepare("SELECT MAX(mileage) AS m FROM services WHERE vehicle_id=? AND id<>?");
+    $prevStmt->execute([$service['vehicle_id'], $id]);
+} else {
+    $prevStmt = db()->prepare("SELECT MAX(mileage) AS m FROM services WHERE vehicle_id=?");
+    $prevStmt->execute([$service['vehicle_id']]);
+}
+$prevServiceMileage = (int)($prevStmt->fetch()['m'] ?? 0);
+
+$vehStmt = db()->prepare("SELECT current_mileage FROM vehicles WHERE id=? AND user_id=?");
+$vehStmt->execute([$service['vehicle_id'], $user['id']]);
+$vehRow = $vehStmt->fetch();
+$vehCurrent = $vehRow ? (int)$vehRow['current_mileage'] : 0;
+
+// previous baseline = max(previous service mileage, vehicle's stored mileage)
+$previousMileage = max($prevServiceMileage, $vehCurrent);
+
+// 2) if user entered 0, reuse previous mileage (if any)
+if ((int)$service['mileage'] === 0 && $previousMileage > 0) {
+    $service['mileage'] = $previousMileage;
+}
+
+// 3) never allow a decrease vs previous mileage
+if ($previousMileage > 0 && (int)$service['mileage'] < $previousMileage) {
+    $errors[] = "Mileage cannot be less than the previous recorded mileage ($previousMileage). "
+              . "Enter a value ≥ $previousMileage, or enter 0 to reuse $previousMileage.";
+}
+
+
   if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $service['service_date'])) $errors[] = 'Invalid date format.';
   if (!is_valid_service_type($SERVICE_TYPES, $service['type'])) {
     $errors[] = 'Please select a valid service type.';
@@ -98,6 +165,20 @@ if ($service['type'] === 'Other' && $service['notes'] === '') {
   if (!is_numeric($service['cost']) || (float)$service['cost'] < 0) $errors[] = 'Cost must be a positive number.';
 
   if (!$errors) {
+  if ($id) {
+    $sql = "UPDATE services 
+            SET vehicle_id=?, service_date=?, type=?, mileage=?, cost=?, notes=? 
+            WHERE id=?";
+    db()->prepare($sql)->execute([
+      $service['vehicle_id'],
+      $service['service_date'],
+      $service['type'],
+      $service['mileage'],
+      $service['cost'],
+      $service['notes'],
+      $id
+    ]);
+  } else {
     $sql = "INSERT INTO services (vehicle_id, service_date, type, mileage, cost, notes)
             VALUES (?,?,?,?,?,?)";
     db()->prepare($sql)->execute([
@@ -108,14 +189,23 @@ if ($service['type'] === 'Other' && $service['notes'] === '') {
       $service['cost'],
       $service['notes']
     ]);
-    header('Location: services.php?vehicle_id=' . $service['vehicle_id']);
-    exit;
   }
+
+  // bump vehicle mileage if this service mileage is higher
+db()->prepare("
+  UPDATE vehicles
+  SET current_mileage = GREATEST(current_mileage, ?)
+  WHERE id = ? AND user_id = ?
+")->execute([(int)$service['mileage'], (int)$service['vehicle_id'], (int)$user['id']]);
+
+  header('Location: services.php?vehicle_id=' . $service['vehicle_id']);
+  exit;
+}
 }
 
 include __DIR__ . '/../templates/header.php';
 ?>
-<h2>Add Service</h2>
+<h2><?= $id ? 'Edit Service' : 'Add Service' ?></h2>
 <?php if ($errors): ?>
 <div class="alert alert-danger"><?php foreach ($errors as $e) echo "<div>".htmlspecialchars($e)."</div>"; ?></div>
 <?php endif; ?>
@@ -167,4 +257,23 @@ include __DIR__ . '/../templates/header.php';
     <a href="services.php" class="btn btn-secondary">Cancel</a>
   </div>
 </form>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const typeSelect = document.querySelector('select[name="type"]');
+  const notes = document.querySelector('textarea[name="notes"]');
+
+  function toggleNotesRequirement() {
+    if (typeSelect.value === "Other") {
+      notes.setAttribute("required", "required");
+      notes.focus();
+    } else {
+      notes.removeAttribute("required");
+    }
+  }
+
+  typeSelect.addEventListener("change", toggleNotesRequirement);
+  toggleNotesRequirement(); // run once on page load
+});
+</script>
+
 <?php include __DIR__ . '/../templates/footer.php'; ?>

@@ -33,19 +33,22 @@ include __DIR__ . '/../templates/header.php';
   <tbody>
     <?php foreach ($vehicles as $v): ?>
     <tr>
-      <td><?=htmlspecialchars($v['reg_no'])?></td>
-      <td><?=htmlspecialchars($v['make'])?></td>
-      <td><?=htmlspecialchars($v['model'])?></td>
-      <td><?=htmlspecialchars($v['year'])?></td>
-      <td><?=htmlspecialchars($v['current_mileage'])?></td>
-      <td><?=htmlspecialchars($v['fuel_type'] ?? '')?></td>
+      <td>
+      <a href="services.php?vehicle_id=<?=$v['id']?>" class="text-decoration-none"><?=htmlspecialchars($v['reg_no'])?></a> </td>
+      <td><a href="services.php?vehicle_id=<?=$v['id']?>" class="text-decoration-none"> <?=htmlspecialchars($v['make'])?></a></td>
+      <td><a href="services.php?vehicle_id=<?=$v['id']?>" class="text-decoration-none"><?=htmlspecialchars($v['model'])?></a></td>
+      <td><a href="services.php?vehicle_id=<?=$v['id']?>" class="text-decoration-none"><?=htmlspecialchars($v['year'])?></a></td>
+      <td><a href="services.php?vehicle_id=<?=$v['id']?>" class="text-decoration-none"><?=htmlspecialchars($v['current_mileage'])?></a></td>
+      <td><a href="services.php?vehicle_id=<?=$v['id']?>" class="text-decoration-none"><?=htmlspecialchars($v['fuel_type'] ?? '')?></a></td>
       <td class="text-end">
-        <a class="btn btn-sm btn-outline-secondary" href="vehicle_form.php?id=<?=$v['id']?>">Edit</a>
-        <form method="post" class="d-inline" onsubmit="return confirm('Delete this vehicle?');">
-          <input type="hidden" name="delete_id" value="<?=$v['id']?>">
-          <button class="btn btn-sm btn-outline-danger">Delete</button>
-        </form>
-      </td>
+  <a class="btn btn-sm btn-outline-primary" href="service_form.php?vehicle_id=<?=$v['id']?>">Add Service</a>
+  <a class="btn btn-sm btn-outline-secondary" href="vehicle_form.php?id=<?=$v['id']?>">Edit</a>
+  <form method="post" class="d-inline" onsubmit="return confirm('Delete this vehicle?');">
+    <input type="hidden" name="delete_id" value="<?=$v['id']?>">
+    <button class="btn btn-sm btn-outline-danger">Delete</button>
+  </form>
+</td>
+
     </tr>
     <?php endforeach; ?>
   </tbody>
