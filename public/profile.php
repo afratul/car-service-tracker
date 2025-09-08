@@ -1,12 +1,21 @@
 <?php
 require_once __DIR__ . '/../app/auth.php';
 require_once __DIR__ . '/../app/db.php';
+require_once __DIR__ . '/../app/config.php';
+
 require_login();
 
 $user = current_user(); // id, name, email, role, etc.
+$currentPhoto = $user['profile_photo'] ?? null; // DB stores just the filename (or null)
+
 
 $success = '';
 $errors  = [];
+
+if (isset($_GET['saved'])) {
+    $success = 'Profile updated successfully.';
+}
+
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $newName = trim($_POST['name'] ?? '');
@@ -40,10 +49,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$errors) {
+          // --- Optional: Profile photo upload ---
+    $newPhotoFilename = null;
+
+    if (!empty($_FILES['photo']['name']) && $_FILES['photo']['error'] !== UPLOAD_ERR_NO_FILE) {
+        if ($_FILES['photo']['error'] !== UPLOAD_ERR_OK) {
+            $errors[] = 'Photo upload failed. Please try again.';
+        } else {
+            // Size check
+            if ($_FILES['photo']['size'] > PROFILE_MAX_BYTES) {
+                $errors[] = 'Photo is too large (max 2 MB).';
+            } else {
+                // MIME check using finfo
+                $finfo = new finfo(FILEINFO_MIME_TYPE);
+                $mime  = $finfo->file($_FILES['photo']['tmp_name']);
+                $allowed = ['image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp'];
+                if (!isset($allowed[$mime])) {
+                    $errors[] = 'Only JPG/PNG/WEBP images are allowed.';
+                } else {
+                    // Generate safe unique name
+                    $ext = $allowed[$mime];
+                    $newPhotoFilename = 'u'.$user['id'].'_'.time().'_'.bin2hex(random_bytes(4)).'.'.$ext;
+
+                    // Move to uploads/profile
+                    $destPath = rtrim(PROFILE_UPLOAD_DIR, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $newPhotoFilename;
+                    if (!@move_uploaded_file($_FILES['photo']['tmp_name'], $destPath)) {
+                        $errors[] = 'Could not save the uploaded photo.';
+                        $newPhotoFilename = null;
+                    }
+                }
+            }
+        }
+    }
+
+    // If any errors occurred during upload, do not update DB yet
+    if (!$errors) {
         // update name
         $stmt = db()->prepare("UPDATE users SET name=? WHERE id=?");
         $stmt->execute([$newName, $user['id']]);
-        $user['name'] = $newName; // refresh local copy
+        $user['name'] = $newName;
 
         // update password if requested
         if ($changePw && $curr !== '' && $new1 !== '' && $new1 === $new2) {
@@ -51,7 +95,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([password_hash($new1, PASSWORD_DEFAULT), $user['id']]);
         }
 
+        // update profile photo if a new one was saved
+        if ($newPhotoFilename) {
+            // delete old photo (only if it lives under our profile dir and is a simple filename)
+            if ($currentPhoto && preg_match('/^[a-z0-9._-]+$/i', $currentPhoto)) {
+                $oldPath = rtrim(PROFILE_UPLOAD_DIR, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $currentPhoto;
+                if (is_file($oldPath)) { @unlink($oldPath); }
+            }
+
+            $stmt = db()->prepare("UPDATE users SET profile_photo=? WHERE id=?");
+            $stmt->execute([$newPhotoFilename, $user['id']]);
+            $currentPhoto = $newPhotoFilename; // refresh for the view
+        }
+
+        // refresh session so navbar/profile see updates immediately
+$_SESSION['user']['name'] = $newName;
+if ($newPhotoFilename) {
+    $_SESSION['user']['profile_photo'] = $newPhotoFilename;
+}
+
+
         $success = 'Profile updated successfully.';
+        header('Location: profile.php?saved=1');
+exit;
+
+
+    }
     }
 }
 
@@ -60,28 +129,55 @@ include __DIR__ . '/../templates/header.php';
 <h2>My Profile</h2>
 
 <?php if ($success): ?>
-  <div class="alert alert-success"><?= htmlspecialchars($success) ?></div>
-<?php endif; ?>
-
-<?php if ($errors): ?>
-  <div class="alert alert-danger">
-    <?php foreach ($errors as $e) echo '<div>'.htmlspecialchars($e).'</div>'; ?>
+  <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+    <?= htmlspecialchars($success) ?>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
   </div>
 <?php endif; ?>
 
+<?php if ($errors): ?>
+  <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+    <?php foreach ($errors as $e) echo '<div>'.htmlspecialchars($e).'</div>'; ?>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+<?php endif; ?>
+
+
 <div class="card shadow-sm">
   <div class="card-body">
-    <form method="post" class="row g-3">
-      <div class="col-md-6">
-        <label class="form-label">Email (read-only)</label>
-        <input type="email" class="form-control" value="<?= htmlspecialchars($user['email']) ?>" readonly>
-        <div class="form-text">Email changes require re-verification. (We can add this later.)</div>
-      </div>
+    <form method="post" class="row g-3" enctype="multipart/form-data">
+     <?php
+  // Build photo URL (if set), else a default avatar
+  if ($currentPhoto && preg_match('/^[a-z0-9._-]+$/i', $currentPhoto)) {
+      $photoUrl = rtrim(BASE_URL, '/') . '/public/uploads/profile/' . $currentPhoto;
+  } else {
+      $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120">
+        <rect width="100%" height="100%" fill="#e9ecef"/>
+        <text x="50%" y="52%" text-anchor="middle" font-size="32" fill="#6c757d" font-family="Arial,Helvetica,sans-serif">👤</text>
+      </svg>';
+      $photoUrl = 'data:image/svg+xml;base64,' . base64_encode($svg);
+  }
+?>
+<div class="col-md-3">
+  <label class="form-label d-block">Profile photo</label>
+  <img src="<?= htmlspecialchars($photoUrl) ?>" alt="Profile" class="rounded border" style="width:120px;height:120px;object-fit:cover;">
+  <input type="file" class="form-control mt-2" name="photo" accept="image/*">
+  <div class="form-text">JPG/PNG/WEBP · Max 2 MB</div>
+</div>
+ 
+  <div class="col-md-9">
+  <div class="mb-3">
+    <label class="form-label">Email</label>
+    <input type="email" class="form-control" value="<?= htmlspecialchars($user['email']) ?>" readonly>
+  </div>
 
-      <div class="col-md-6">
-        <label class="form-label">Name</label>
-        <input name="name" class="form-control" value="<?= htmlspecialchars($user['name']) ?>" required>
-      </div>
+  <div class="mb-3">
+    <label class="form-label">Name</label>
+    <input name="name" class="form-control" value="<?= htmlspecialchars($user['name']) ?>" required>
+  </div>
+</div>
+
+
 
       <div class="col-12"><hr></div>
       <div class="col-12">

@@ -1,4 +1,19 @@
 <?php require_once __DIR__ . '/../app/config.php'; ?>
+
+<?php
+$currentPhoto = $_SESSION['user']['profile_photo'] ?? null;
+if ($currentPhoto && preg_match('/^[a-z0-9._-]+$/i', $currentPhoto)) {
+    $navPhotoUrl = rtrim(BASE_URL, '/') . '/public/uploads/profile/' . $currentPhoto;
+} else {
+    // Default avatar
+    $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+      <rect width="100%" height="100%" fill="#e9ecef"/>
+      <text x="50%" y="55%" text-anchor="middle" font-size="18" fill="#6c757d" font-family="Arial,Helvetica,sans-serif">👤</text>
+    </svg>';
+    $navPhotoUrl = 'data:image/svg+xml;base64,' . base64_encode($svg);
+}
+?>
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -46,7 +61,9 @@
 
       <div class="d-flex">
   <?php if ($loggedIn): ?>
-    <a class="btn btn-outline-primary btn-sm me-2 <?=($currentPage=='profile.php'?'active':'')?>" href="profile.php">Profile</a>
+    <a class="btn btn-outline-primary btn-sm me-2 <?=($currentPage=='profile.php'?'active':'')?>" href="profile.php">
+  <img src="<?= htmlspecialchars($navPhotoUrl) ?>" alt="Profile" class="rounded-circle me-1" style="width:24px;height:24px;object-fit:cover;">Profile</a>
+
     <a class="btn btn-outline-secondary btn-sm" href="logout.php">Logout</a>
   <?php else: ?>
     <a class="btn btn-primary btn-sm" href="login.php">Login</a>

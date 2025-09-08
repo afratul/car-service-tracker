@@ -16,6 +16,18 @@ $BASE_URL = '/car-service-tracker/public'; // adjust if different
 $UPLOAD_DIR = __DIR__ . '/../public/uploads';
 $MAX_UPLOAD_BYTES = 2 * 1024 * 1024; // 2MB
 
+// === Uploads (profile photos) ===
+define('UPLOAD_BASE', __DIR__ . '/../public/uploads');
+define('PROFILE_UPLOAD_DIR', UPLOAD_BASE . '/profile');
+define('PROFILE_MAX_BYTES', 2 * 1024 * 1024); // 2 MB
+$PROFILE_ALLOWED_MIME = ['image/jpeg','image/png','image/webp'];
+
+// Ensure folder exists (safe if already exists)
+if (!is_dir(PROFILE_UPLOAD_DIR)) {
+    @mkdir(PROFILE_UPLOAD_DIR, 0777, true);
+}
+
+
 // Start session (secure-ish defaults for local dev)
 ini_set('session.cookie_httponly', '1');
 session_name('CSTSESSID');
