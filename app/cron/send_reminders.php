@@ -9,10 +9,9 @@ require_once __DIR__ . '/../../app/mail.php';
 date_default_timezone_set('Asia/Dhaka');
 
 // === Config (edit if you like) ===
-$REMINDER_LOOKBACK_DAYS = 7; // don't re-email same (user+vehicle+rule) within this many days
+$REMINDER_LOOKBACK_DAYS = 0; // re-send every run (no cooldown)
 
 // Default rules for service "types" in your dropdown (km OR days)
-// Tip: tweak to your preference later — these are sensible starting points.
 $RULES = [
   'Gear oil change'            => ['km' => 40000, 'days' => 720], // 2 years
   'Brake fluid change'         => ['km' => 40000, 'days' => 730], // ~2 years
@@ -117,7 +116,8 @@ foreach ($users as $u) {
 
       if (km_or_days_due($sinceKm, $sinceDays, $rule['km'], $rule['days'])) {
         if (!already_sent_recently($userId, $vehicleId, $ruleKey, $REMINDER_LOOKBACK_DAYS)) {
-          $subject = "Engine oil change due — {$reg}";
+          // SAFE subject line (ASCII hyphen)
+          $subject = "Engine oil change due - {$reg}";
           $html = "<p>Hi ".htmlspecialchars($u['name']).",</p>
                    <p><strong>{$reg}</strong> is due for an <strong>Engine oil change</strong>.</p>
                    <ul>
@@ -164,7 +164,8 @@ foreach ($users as $u) {
 
       if (km_or_days_due($sinceKm, $sinceDays, $rule['km'], $rule['days'])) {
         if (!already_sent_recently($userId, $vehicleId, $ruleKey, $REMINDER_LOOKBACK_DAYS)) {
-          $subject = "{$type} due — {$reg}";
+          // SAFE subject line (ASCII hyphen)
+          $subject = "{$type} due - {$reg}";
           $html = "<p>Hi ".htmlspecialchars($u['name']).",</p>
                    <p><strong>{$reg}</strong> is due for <strong>".htmlspecialchars($type)."</strong>.</p>
                    <ul>

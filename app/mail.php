@@ -37,6 +37,7 @@ function send_mail(string $toEmail, string $toName, string $subject, string $htm
 
         // Content
         $mail->isHTML(true);
+        $mail->CharSet = 'UTF-8';
         $mail->Subject = $subject;
         $mail->Body    = $htmlBody;
         $mail->AltBody = strip_tags($htmlBody);
