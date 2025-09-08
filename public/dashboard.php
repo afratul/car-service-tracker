@@ -103,6 +103,8 @@ foreach ($userVehicles as $v) {
 include __DIR__ . '/../templates/header.php';
 ?>
 <h2 class="mb-4">Dashboard</h2>
+<p class="lead">Welcome, <?= htmlspecialchars($user['name']) ?> 👋</p>
+
 
 <div class="row g-3">
   <div class="col-md-4">

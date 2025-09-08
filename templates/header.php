@@ -37,7 +37,6 @@
 </li>
 <li class="nav-item">
   <a class="nav-link <?=($currentPage=='service_form.php'?'active':'')?>" href="service_form.php">Add Service</a>
-</li>
 
         <?php else: ?>
           <li class="nav-item"><a class="nav-link" href="login.php">Login</a></li>
@@ -46,13 +45,14 @@
       </ul>
 
       <div class="d-flex">
-        <?php if ($loggedIn): ?>
-          <span class="me-3">Hi, <?=htmlspecialchars($_SESSION['user']['name'])?></span>
-          <a class="btn btn-outline-secondary btn-sm" href="logout.php">Logout</a>
-        <?php else: ?>
-          <a class="btn btn-primary btn-sm" href="login.php">Login</a>
-        <?php endif; ?>
-      </div>
+  <?php if ($loggedIn): ?>
+    <a class="btn btn-outline-primary btn-sm me-2 <?=($currentPage=='profile.php'?'active':'')?>" href="profile.php">Profile</a>
+    <a class="btn btn-outline-secondary btn-sm" href="logout.php">Logout</a>
+  <?php else: ?>
+    <a class="btn btn-primary btn-sm" href="login.php">Login</a>
+  <?php endif; ?>
+</div>
+
     </div>
   </div>
 </nav>
