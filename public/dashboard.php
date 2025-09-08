@@ -163,8 +163,101 @@ foreach ($userVehicles as $v) {
 $dueCount = count($alerts);
 
 
-include __DIR__ . '/../templates/header.php';
+// ---------- Nearby Predictions (show like Alerts) ----------
+$PREDICT_KM_WINDOW   = 1000;
+$PREDICT_DAYS_WINDOW = 30;
+$predictionsSoon = [];
+
+/* loop over $userVehicles and compute $predictionsSoon
+   (the exact snippet you posted goes here unchanged) */
+   foreach ($userVehicles as $v) {
+    $vehicleId = (int)$v['id'];
+    $reg       = $v['reg_no'];
+    $vehOdo    = (int)$v['current_mileage'];
+
+    // 1) Engine oil change (depends on oil_type)
+    $lastOil = db()->prepare("
+      SELECT service_date, mileage, oil_type
+      FROM services
+      WHERE vehicle_id=? AND type='Engine oil change'
+      ORDER BY service_date DESC, id DESC
+      LIMIT 1
+    ");
+    $lastOil->execute([$vehicleId]);
+    if ($oil = $lastOil->fetch()) {
+        $oilType   = $oil['oil_type'] ?? null;
+        $rule      = $OIL_RULES[$oilType] ?? $OIL_RULES['_default'];
+        $lastKm    = (int)$oil['mileage'];
+        $lastDate  = new DateTime($oil['service_date']);
+        $sinceKm   = max(0, $vehOdo - $lastKm);
+        $sinceDays = $today->diff($lastDate)->days;
+
+        $kmToDue   = ($rule['km']   > 0 ? max(0, $rule['km']   - $sinceKm)   : PHP_INT_MAX);
+        $daysToDue = ($rule['days'] > 0 ? max(0, $rule['days'] - $sinceDays) : PHP_INT_MAX);
+
+        // Only if within window and not already due (due items appear in Alerts)
+        if (($kmToDue <= $PREDICT_KM_WINDOW) || ($daysToDue <= $PREDICT_DAYS_WINDOW)) {
+            if (!km_or_days_due($sinceKm, $sinceDays, $rule['km'], $rule['days'])) {
+                $reason = [];
+                if ($kmToDue   !== PHP_INT_MAX) $reason[] = "{$kmToDue} km to due";
+                if ($daysToDue !== PHP_INT_MAX) $reason[] = "{$daysToDue} days to due";
+
+                $predictionsSoon[] = [
+                    'vehicle_id' => $vehicleId,
+                    'reg_no'     => $reg,
+                    'type'       => 'Engine oil change',
+                    'reason'     => implode(' • ', $reason),
+                    'sort_key'   => min($kmToDue, $daysToDue),
+                ];
+            }
+        }
+    }
+
+    // 2) All other rule-based services
+    foreach ($RULES as $type => $rule) {
+        $st = db()->prepare("
+            SELECT service_date, mileage
+            FROM services
+            WHERE vehicle_id=? AND type=?
+            ORDER BY service_date DESC, id DESC
+            LIMIT 1
+        ");
+        $st->execute([$vehicleId, $type]);
+        $row = $st->fetch();
+        if (!$row) continue;
+
+        $lastKm    = (int)$row['mileage'];
+        $lastDate  = new DateTime($row['service_date']);
+        $sinceKm   = max(0, $vehOdo - $lastKm);
+        $sinceDays = $today->diff($lastDate)->days;
+
+        $kmToDue   = ($rule['km']   > 0 ? max(0, $rule['km']   - $sinceKm)   : PHP_INT_MAX);
+        $daysToDue = ($rule['days'] > 0 ? max(0, $rule['days'] - $sinceDays) : PHP_INT_MAX);
+
+        if (($kmToDue <= $PREDICT_KM_WINDOW) || ($daysToDue <= $PREDICT_DAYS_WINDOW)) {
+            if (!km_or_days_due($sinceKm, $sinceDays, $rule['km'], $rule['days'])) {
+                $reason = [];
+                if ($kmToDue   !== PHP_INT_MAX) $reason[] = "{$kmToDue} km to due";
+                if ($daysToDue !== PHP_INT_MAX) $reason[] = "{$daysToDue} days to due";
+
+                $predictionsSoon[] = [
+                    'vehicle_id' => $vehicleId,
+                    'reg_no'     => $reg,
+                    'type'       => $type,
+                    'reason'     => implode(' • ', $reason),
+                    'sort_key'   => min($kmToDue, $daysToDue),
+                ];
+            }
+        }
+    }
+}
+
+usort($predictionsSoon, fn($a,$b) => $a['sort_key'] <=> $b['sort_key']);
 ?>
+
+
+<?php include __DIR__ . '/../templates/header.php'; ?>
+
 <h2 class="mb-4">Dashboard</h2>
 <p class="lead">Welcome, <?= htmlspecialchars($user['name']) ?> 👋</p>
 
@@ -206,6 +299,7 @@ include __DIR__ . '/../templates/header.php';
       </div>
     </div>
   </div>
+
 </div>
 
 <!-- Maintenance Alerts -->
@@ -239,6 +333,39 @@ include __DIR__ . '/../templates/header.php';
 
             </div>
             <a class="btn btn-sm btn-outline-primary" href="service_form.php?vehicle_id=<?= $a['vehicle_id'] ?>">Log service</a>
+          </li>
+        <?php endforeach; ?>
+      </ul>
+    <?php endif; ?>
+  </div>
+</div>
+
+<!-- Nearby Predictions (like Alerts) -->
+<div class="card shadow-sm mt-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h5 class="m-0">
+  Upcoming Predictions
+  <span class="badge text-bg-info ms-2"><?= count($predictionsSoon) ?></span>
+</h5>
+
+      <a class="btn btn-sm btn-outline-secondary" href="predictions.php">View all</a>
+    </div>
+
+    <?php if (!$predictionsSoon): ?>
+      <div class="text-muted">Nothing coming up soon.</div>
+    <?php else: ?>
+      <ul class="list-group list-group-flush">
+        <?php foreach ($predictionsSoon as $p): ?>
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+              <strong><?= htmlspecialchars($p['type']) ?></strong>
+              <div class="small text-muted">
+                <?= htmlspecialchars($p['reg_no']) ?> • <?= htmlspecialchars($p['reason']) ?>
+              </div>
+            </div>
+            <a class="btn btn-sm btn-outline-primary"
+               href="service_form.php?vehicle_id=<?= (int)$p['vehicle_id'] ?>">Log service</a>
           </li>
         <?php endforeach; ?>
       </ul>

@@ -48,6 +48,10 @@ if ($currentPhoto && preg_match('/^[a-z0-9._-]+$/i', $currentPhoto)) {
   <a class="nav-link <?=($currentPage=='services.php'?'active':'')?>" href="services.php">Service Records</a>
 </li>
 <li class="nav-item">
+  <a class="nav-link <?=($currentPage=='predictions.php'?'active':'')?>" href="predictions.php">Predictions</a>
+</li>
+
+<li class="nav-item">
   <a class="nav-link <?=($currentPage=='vehicle_form.php'?'active':'')?>" href="vehicle_form.php">Add Vehicle</a>
 </li>
 <li class="nav-item">
