@@ -28,6 +28,25 @@ $perPage = 10;                                      // rows per page
 $page    = max(1, (int)($_GET['page'] ?? 1));       // current page
 $offset  = ($page - 1) * $perPage;
 
+// Sorting (whitelisted)
+$allowedSorts = [
+  'date'    => 's.service_date',
+  'vehicle' => 'v.reg_no',
+  'type'    => 's.type',
+  'mileage' => 's.mileage',
+  'cost'    => 's.cost',
+];
+
+$sort = $_GET['sort'] ?? 'date';
+$dir  = strtolower($_GET['dir'] ?? 'desc');
+
+if (!isset($allowedSorts[$sort])) $sort = 'date';
+$dir = ($dir === 'asc') ? 'asc' : 'desc';
+
+// final ORDER BY clause; make it stable by also ordering by id
+$orderSql = $allowedSorts[$sort] . ' ' . strtoupper($dir) . ', s.id ' . strtoupper($dir);
+
+
 // Handle delete securely (only your own records)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
     $sid = (int)$_POST['delete_id'];
@@ -86,8 +105,9 @@ $sql = "SELECT s.*, v.reg_no
         FROM services s
         JOIN vehicles v ON s.vehicle_id = v.id
         WHERE " . implode(' AND ', $where) . "
-        ORDER BY s.service_date DESC, s.id DESC
+        ORDER BY {$orderSql}
         LIMIT {$perPage} OFFSET {$offset}";
+
 $q = db()->prepare($sql);
 $q->execute($params);
 $rows = $q->fetchAll();
@@ -154,12 +174,62 @@ include __DIR__ . '/../templates/header.php';
   </a>
 </div>
 
+<?php
+  // Build base query string for sort links (keep filters, drop page so it resets to 1)
+  $qsSort = [];
+  if ($vehicleId) $qsSort['vehicle_id'] = (int)$vehicleId;
+  if ($search !== '') $qsSort['q'] = $search;
+
+  // helper: make a sort link that toggles asc/desc for given key
+  function sortUrl($key, $currentSort, $currentDir, $qs) {
+    $dir = 'asc';
+    if ($currentSort === $key) {
+      $dir = ($currentDir === 'asc') ? 'desc' : 'asc';
+    }
+    $qs = array_merge($qs, ['sort' => $key, 'dir' => $dir]);
+    return 'services.php?' . http_build_query($qs);
+  }
+
+  // helper: visual arrow next to active column
+  function sortArrow($key, $currentSort, $currentDir) {
+    if ($currentSort !== $key) return '';
+    return $currentDir === 'asc' ? ' &uarr;' : ' &darr;';
+  }
+?>
+
 <table class="table table-striped mt-3">
   <thead>
-    <tr>
-      <th>Date</th><th>Vehicle</th><th>Type</th><th>Mileage</th><th>Cost</th><th>Notes</th><th></th>
-    </tr>
-  </thead>
+  <tr>
+    <th>
+      <a class="text-decoration-none" href="<?= sortUrl('date', $sort, $dir, $qsSort) ?>">
+        Date<?= sortArrow('date', $sort, $dir) ?>
+      </a>
+    </th>
+    <th>
+      <a class="text-decoration-none" href="<?= sortUrl('vehicle', $sort, $dir, $qsSort) ?>">
+        Vehicle<?= sortArrow('vehicle', $sort, $dir) ?>
+      </a>
+    </th>
+    <th>
+      <a class="text-decoration-none" href="<?= sortUrl('type', $sort, $dir, $qsSort) ?>">
+        Type<?= sortArrow('type', $sort, $dir) ?>
+      </a>
+    </th>
+    <th class="text-end">
+      <a class="text-decoration-none" href="<?= sortUrl('mileage', $sort, $dir, $qsSort) ?>">
+        Mileage<?= sortArrow('mileage', $sort, $dir) ?>
+      </a>
+    </th>
+    <th class="text-end">
+      <a class="text-decoration-none" href="<?= sortUrl('cost', $sort, $dir, $qsSort) ?>">
+        Cost<?= sortArrow('cost', $sort, $dir) ?>
+      </a>
+    </th>
+    <th>Notes</th>
+    <th></th>
+  </tr>
+</thead>
+
   <tbody>
     <?php foreach($rows as $r): ?>
     <tr>
