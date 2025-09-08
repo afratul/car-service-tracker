@@ -42,15 +42,50 @@ $recent = db()->prepare("
 $recent->execute([$user['id']]);
 $recentRows = $recent->fetchAll();
 
-// --- Engine oil change alerts (oil-type-specific rules) ---
-$OIL_RULES = [
-  'Mineral'         => ['km' => 2500, 'days' => 90],   // 3 months or 2500 km
-  'Semi synthetic'  => ['km' => 3500, 'days' => 180],  // 6 months or 3500 km
-  'Full synthetic'  => ['km' => 5000, 'days' => 180],  // 6 months or 5000 km
-  '_default'        => ['km' => 5000, 'days' => 180],  // fallback if oil_type is NULL/unknown
+// --- Maintenance alerts (all types, same logic as cron) ---
+
+// Core rules (km OR days)
+$RULES = [
+  'Gear oil change'            => ['km' => 40000, 'days' => 720],
+  'Brake fluid change'         => ['km' => 40000, 'days' => 730],
+  'Engine coolant change'      => ['km' => 40000, 'days' => 730],
+  'Engine coolant check'       => ['km' => 5000,  'days' => 90],
+  'Brake pads check'           => ['km' => 10000, 'days' => 180],
+  'Brake discs/rotors check'   => ['km' => 20000, 'days' => 365],
+  'Tire rotation'              => ['km' => 8000,  'days' => 180],
+  'Wheel alignment'            => ['km' => 10000, 'days' => 365],
+  'Wheel balancing'            => ['km' => 10000, 'days' => 365],
+  'Air filter change'          => ['km' => 15000, 'days' => 365],
+  'Cabin filter change'        => ['km' => 15000, 'days' => 365],
+  'Fuel filter change'         => ['km' => 30000, 'days' => 730],
+  'Spark plug replacement'     => ['km' => 30000, 'days' => 730],
+  'Battery check/replacement'  => ['km' => 20000, 'days' => 365],
+  'Timing belt/chain check'    => ['km' => 50000, 'days' => 730],
+  'Drive belt/serpentine belt check' => ['km' => 30000, 'days' => 365],
+  'Complete suspension check'  => ['km' => 20000, 'days' => 365],
+  'Shock absorbers/struts check' => ['km' => 30000, 'days' => 365],
+  'AC system check'            => ['km' => 20000, 'days' => 365],
+  'Lights & electrical check'  => ['km' => 0,     'days' => 180], // time-only
+  'Exhaust system check'       => ['km' => 20000, 'days' => 365],
+  'Windshield washer fluid refill' => ['km' => 0, 'days' => 90], // time-only
+  'Power steering fluid check' => ['km' => 20000, 'days' => 365],
+  'Tire check'                 => ['km' => 5000,  'days' => 90],
 ];
 
-// Load user's vehicles with their current mileage
+// Engine oil depends on oil_type
+$OIL_RULES = [
+  'Mineral'         => ['km' => 2500, 'days' => 90],
+  'Semi synthetic'  => ['km' => 3500, 'days' => 180],
+  'Full synthetic'  => ['km' => 5000, 'days' => 180],
+  '_default'        => ['km' => 5000, 'days' => 180],
+];
+
+function km_or_days_due(?int $sinceKm, ?int $sinceDays, int $limitKm, int $limitDays): bool {
+  $kmDue   = ($limitKm  > 0 && $sinceKm  !== null && $sinceKm  >= $limitKm);
+  $timeDue = ($limitDays> 0 && $sinceDays!== null && $sinceDays>= $limitDays);
+  return $kmDue || $timeDue;
+}
+
 $vehStmt = db()->prepare("SELECT id, reg_no, current_mileage FROM vehicles WHERE user_id=? ORDER BY id ASC");
 $vehStmt->execute([$user['id']]);
 $userVehicles = $vehStmt->fetchAll();
@@ -59,45 +94,73 @@ $alerts = [];
 $today = new DateTime();
 
 foreach ($userVehicles as $v) {
-    // most recent engine oil change for this vehicle (now also fetching oil_type)
-    $lastOil = db()->prepare("
-        SELECT service_date, mileage, oil_type
-        FROM services
-        WHERE vehicle_id=? AND type='Engine oil change'
-        ORDER BY service_date DESC, id DESC
-        LIMIT 1
-    ");
-    $lastOil->execute([$v['id']]);
-    $row = $lastOil->fetch();
+  $vehicleId = (int)$v['id'];
+  $reg       = $v['reg_no'];
+  $vehOdo    = (int)$v['current_mileage'];
 
-    $oilType   = $row['oil_type'] ?? null;
-    $rule      = $OIL_RULES[$oilType] ?? $OIL_RULES['_default'];
+  // 1) Engine oil (most recent record)
+  $lastOil = db()->prepare("
+    SELECT service_date, mileage, oil_type
+    FROM services
+    WHERE vehicle_id=? AND type='Engine oil change'
+    ORDER BY service_date DESC, id DESC
+    LIMIT 1
+  ");
+  $lastOil->execute([$vehicleId]);
+  if ($oil = $lastOil->fetch()) {
+    $oilType   = $oil['oil_type'] ?? null;
+    $ruleOil   = $OIL_RULES[$oilType] ?? $OIL_RULES['_default'];
+    $lastKm    = (int)$oil['mileage'];
+    $lastDate  = new DateTime($oil['service_date']);
+    $sinceKm   = max(0, $vehOdo - $lastKm);
+    $sinceDays = $today->diff($lastDate)->days;
 
-    $lastMileage = $row ? (int)$row['mileage'] : 0;
-    $lastDate    = $row && !empty($row['service_date']) ? new DateTime($row['service_date']) : null;
-
-    $sinceMileage = max(0, (int)$v['current_mileage'] - $lastMileage);
-    $sinceDays    = $lastDate ? $today->diff($lastDate)->days : null;
-
-    $dueByMileage = ($sinceMileage >= $rule['km']);
-    $dueByTime    = ($sinceDays !== null && $sinceDays >= $rule['days']);
-
-    if ($dueByMileage || $dueByTime) {
-        $reason = [];
-        // include oil type in the reason if we have it
-        if ($oilType) {
-            $reason[] = "Oil: $oilType";
-        }
-        if ($dueByMileage) $reason[] = "{$sinceMileage} km since last oil change (limit {$rule['km']} km)";
-        if ($dueByTime)    $reason[] = "{$sinceDays} days since last oil change (limit {$rule['days']} days)";
-        $alerts[] = [
-            'reg_no'     => $v['reg_no'],
-            'reason'     => implode(' • ', $reason),
-            'vehicle_id' => $v['id'],
-        ];
+    if (km_or_days_due($sinceKm, $sinceDays, $ruleOil['km'], $ruleOil['days'])) {
+      $reason = [];
+      if ($ruleOil['km'] > 0)   $reason[] = "{$sinceKm} km since last";
+      if ($ruleOil['days'] > 0) $reason[] = "{$sinceDays} days since last";
+      $alerts[] = [
+        'vehicle_id' => $vehicleId,
+        'reg_no'     => $reg,
+        'type'       => 'Engine oil change' . ($oilType ? " ({$oilType})" : ''),
+        'reason'     => implode(' • ', $reason),
+      ];
     }
+  }
+
+  // 2) All other service types in $RULES
+  foreach ($RULES as $type => $rule) {
+    $st = db()->prepare("
+      SELECT service_date, mileage
+      FROM services
+      WHERE vehicle_id=? AND type=?
+      ORDER BY service_date DESC, id DESC
+      LIMIT 1
+    ");
+    $st->execute([$vehicleId, $type]);
+    $row = $st->fetch();
+    if (!$row) continue; // no record yet → skip
+
+    $lastKm    = (int)$row['mileage'];
+    $lastDate  = new DateTime($row['service_date']);
+    $sinceKm   = max(0, $vehOdo - $lastKm);
+    $sinceDays = $today->diff($lastDate)->days;
+
+    if (km_or_days_due($sinceKm, $sinceDays, $rule['km'], $rule['days'])) {
+      $reason = [];
+      if ($rule['km'] > 0)   $reason[] = "{$sinceKm} km since last";
+      if ($rule['days'] > 0) $reason[] = "{$sinceDays} days since last";
+      $alerts[] = [
+        'vehicle_id' => $vehicleId,
+        'reg_no'     => $reg,
+        'type'       => $type,
+        'reason'     => implode(' • ', $reason),
+      ];
+    }
+  }
 }
 
+$dueCount = count($alerts);
 
 
 include __DIR__ . '/../templates/header.php';
@@ -149,8 +212,18 @@ include __DIR__ . '/../templates/header.php';
 <div class="card shadow-sm mt-4">
   <div class="card-body">
     <div class="d-flex justify-content-between align-items-center mb-2">
-      <h5 class="m-0">Maintenance Alerts</h5>
-    </div>
+  <h5 class="m-0">
+    Maintenance Alerts
+    <?php if ($dueCount): ?>
+      <span class="badge text-bg-danger ms-2"><?= $dueCount ?></span>
+    <?php else: ?>
+      <span class="badge text-bg-secondary ms-2">0</span>
+    <?php endif; ?>
+  </h5>
+  <a class="btn btn-sm btn-outline-secondary" href="due_services.php">View all</a>
+
+</div>
+
 
     <?php if (!$alerts): ?>
       <div class="text-muted">No alerts right now.</div>
@@ -159,8 +232,11 @@ include __DIR__ . '/../templates/header.php';
         <?php foreach ($alerts as $a): ?>
           <li class="list-group-item d-flex justify-content-between align-items-center">
             <div>
-              <strong><?= htmlspecialchars($a['reg_no']) ?></strong>
-              <div class="small text-muted"><?= htmlspecialchars($a['reason']) ?></div>
+              <strong><?= htmlspecialchars($a['type']) ?></strong>
+            <div class="small text-muted">
+              <?= htmlspecialchars($a['reg_no']) ?> • <?= htmlspecialchars($a['reason']) ?>
+            </div>
+
             </div>
             <a class="btn btn-sm btn-outline-primary" href="service_form.php?vehicle_id=<?= $a['vehicle_id'] ?>">Log service</a>
           </li>
