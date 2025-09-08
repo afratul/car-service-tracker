@@ -307,7 +307,7 @@ usort($predictionsSoon, fn($a,$b) => $a['sort_key'] <=> $b['sort_key']);
   <div class="card-body">
     <div class="d-flex justify-content-between align-items-center mb-2">
   <h5 class="m-0">
-    Maintenance Alerts
+  🚨 Maintenance Alerts
     <?php if ($dueCount): ?>
       <span class="badge text-bg-danger ms-2"><?= $dueCount ?></span>
     <?php else: ?>
@@ -345,7 +345,7 @@ usort($predictionsSoon, fn($a,$b) => $a['sort_key'] <=> $b['sort_key']);
   <div class="card-body">
     <div class="d-flex justify-content-between align-items-center mb-2">
       <h5 class="m-0">
-  Upcoming Predictions
+  ⏳ Upcoming Predictions
   <span class="badge text-bg-info ms-2"><?= count($predictionsSoon) ?></span>
 </h5>
 

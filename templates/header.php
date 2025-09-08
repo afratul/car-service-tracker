@@ -28,7 +28,7 @@ if ($currentPhoto && preg_match('/^[a-z0-9._-]+$/i', $currentPhoto)) {
 
 <nav class="navbar navbar-expand-lg bg-light border-bottom">
   <div class="container">
-    <a class="navbar-brand fw-bold" href="dashboard.php">CST</a>
+    <a class="navbar-brand fw-bold" href="dashboard.php">🚗 Car Service Tracker</a>
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
