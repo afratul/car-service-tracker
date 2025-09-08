@@ -20,6 +20,14 @@ $vs = db()->prepare("SELECT id, reg_no FROM vehicles WHERE user_id=? ORDER BY id
 $vs->execute([$user['id']]);
 $vehicles = $vs->fetchAll();
 
+// Search term (service type)
+$search = trim($_GET['q'] ?? '');   // e.g., "oil", "coolant", etc.
+
+// Pagination
+$perPage = 10;                                      // rows per page
+$page    = max(1, (int)($_GET['page'] ?? 1));       // current page
+$offset  = ($page - 1) * $perPage;
+
 // Handle delete securely (only your own records)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
     $sid = (int)$_POST['delete_id'];
@@ -42,23 +50,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
     exit;
 }
 
-// Fetch user's services (joined with their vehicles)
+// Fetch user's services (joined with their vehicles) + optional vehicle filter + optional search
+// Build WHERE for both count and data queries
+$where  = ["v.user_id=?"];
+$params = [$user['id']];
+
 if ($vehicleId) {
-    $q = db()->prepare("SELECT s.*, v.reg_no
-                        FROM services s
-                        JOIN vehicles v ON s.vehicle_id = v.id
-                        WHERE v.user_id=? AND v.id=?
-                        ORDER BY s.service_date DESC, s.id DESC");
-    $q->execute([$user['id'], $vehicleId]);
-} else {
-    $q = db()->prepare("SELECT s.*, v.reg_no
-                        FROM services s
-                        JOIN vehicles v ON s.vehicle_id = v.id
-                        WHERE v.user_id=?
-                        ORDER BY s.service_date DESC, s.id DESC");
-    $q->execute([$user['id']]);
+  $where[]  = "v.id=?";
+  $params[] = $vehicleId;
 }
+
+if ($search !== '') {
+  $where[]  = "s.type LIKE ?";
+  $params[] = '%' . $search . '%';
+}
+
+// 1) Count total rows for pagination
+$sqlCount = "SELECT COUNT(*) AS c
+             FROM services s
+             JOIN vehicles v ON s.vehicle_id = v.id
+             WHERE " . implode(' AND ', $where);
+$qc = db()->prepare($sqlCount);
+$qc->execute($params);
+$totalRows = (int)$qc->fetchColumn();
+$totalPages = max(1, (int)ceil($totalRows / $perPage));
+
+// Correct page if out of range
+if ($page > $totalPages) {
+  $page = $totalPages;
+  $offset = ($page - 1) * $perPage;
+}
+
+// 2) Fetch current page of rows
+$sql = "SELECT s.*, v.reg_no
+        FROM services s
+        JOIN vehicles v ON s.vehicle_id = v.id
+        WHERE " . implode(' AND ', $where) . "
+        ORDER BY s.service_date DESC, s.id DESC
+        LIMIT {$perPage} OFFSET {$offset}";
+$q = db()->prepare($sql);
+$q->execute($params);
 $rows = $q->fetchAll();
+
 
 include __DIR__ . '/../templates/header.php';
 ?>
@@ -94,15 +127,32 @@ include __DIR__ . '/../templates/header.php';
       <?php endforeach; ?>
     </select>
   </div>
+
+    <div class="col-md-4">
+    <label class="form-label">Search by Type</label>
+    <input type="text"
+           class="form-control"
+           name="q"
+           value="<?= htmlspecialchars($search) ?>"
+           placeholder="e.g., oil, coolant, brake">
+  </div>
+
+  <div class="col-md-4 d-flex align-items-end">
+    <button class="btn btn-primary me-2">Search</button>
+    <a class="btn btn-outline-secondary"
+       href="services.php<?= $vehicleId ? ('?vehicle_id='.(int)$vehicleId) : '' ?>">
+       Clear
+    </a>
+  </div>
+
 </form>
 
 <div class="mt-2">
   <a class="btn btn-outline-secondary btn-sm"
-     href="export_services.php<?= $vehicleId ? ('?vehicle_id='.(int)$vehicleId) : '' ?>">
+     href="export_services.php<?= $vehicleId ? ('?vehicle_id='.(int)$vehicleId) : '' ?><?= $search !== '' ? ($vehicleId ? '&' : '?') . 'q=' . urlencode($search) : '' ?>">
     Export CSV
   </a>
 </div>
-
 
 <table class="table table-striped mt-3">
   <thead>
@@ -151,6 +201,50 @@ include __DIR__ . '/../templates/header.php';
     <?php endforeach; ?>
   </tbody>
 </table>
+
+<?php
+  // Build base query string preserving filters
+  $qs = [];
+  if ($vehicleId) $qs['vehicle_id'] = (int)$vehicleId;
+  if ($search !== '') $qs['q'] = $search;
+
+  // helper to build URL with page number
+  function pageUrl($p, $qs) {
+    $qs = array_merge($qs, ['page' => $p]);
+    return 'services.php?' . http_build_query($qs);
+  }
+?>
+
+<nav aria-label="Service pagination">
+  <ul class="pagination justify-content-center">
+    <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
+      <a class="page-link" href="<?= $page <= 1 ? '#' : pageUrl($page-1, $qs) ?>">Previous</a>
+    </li>
+
+    <?php
+      // simple window: show up to 7 pages around current
+      $start = max(1, $page - 3);
+      $end   = min($totalPages, $page + 3);
+      if ($start > 1) {
+        echo '<li class="page-item"><a class="page-link" href="'.pageUrl(1,$qs).'">1</a></li>';
+        if ($start > 2) echo '<li class="page-item disabled"><span class="page-link">…</span></li>';
+      }
+      for ($p = $start; $p <= $end; $p++) {
+        $active = ($p === $page) ? ' active' : '';
+        echo '<li class="page-item'.$active.'"><a class="page-link" href="'.pageUrl($p,$qs).'">'.$p.'</a></li>';
+      }
+      if ($end < $totalPages) {
+        if ($end < $totalPages - 1) echo '<li class="page-item disabled"><span class="page-link">…</span></li>';
+        echo '<li class="page-item"><a class="page-link" href="'.pageUrl($totalPages,$qs).'">'.$totalPages.'</a></li>';
+      }
+    ?>
+
+    <li class="page-item <?= $page >= $totalPages ? 'disabled' : '' ?>">
+      <a class="page-link" href="<?= $page >= $totalPages ? '#' : pageUrl($page+1, $qs) ?>">Next</a>
+    </li>
+  </ul>
+</nav>
+
 
 <?php if ($rows): ?>
   <?php foreach ($rows as $r): ?>
