@@ -96,6 +96,14 @@ include __DIR__ . '/../templates/header.php';
   </div>
 </form>
 
+<div class="mt-2">
+  <a class="btn btn-outline-secondary btn-sm"
+     href="export_services.php<?= $vehicleId ? ('?vehicle_id='.(int)$vehicleId) : '' ?>">
+    Export CSV
+  </a>
+</div>
+
+
 <table class="table table-striped mt-3">
   <thead>
     <tr>
