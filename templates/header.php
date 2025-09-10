@@ -28,14 +28,29 @@ if ($currentPhoto && preg_match('/^[a-z0-9._-]+$/i', $currentPhoto)) {
 <?php $currentPage = basename($_SERVER['PHP_SELF']); ?>
 
 <nav class="navbar navbar-expand-lg bg-light border-bottom">
-  <div class="container">
-    <a class="navbar-brand fw-bold" href="dashboard.php">🚗 Car Service Tracker</a>
+  <div class="container position-relative">
 
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
+    <!-- Brand centered -->
+   <?php if (!empty($_SESSION['user'])): ?>
+  <!-- Logged in: show brand on the left -->
+  <a class="navbar-brand fw-bold" href="dashboard.php">🚗 Car Service Tracker</a>
+<?php else: ?>
+  <!-- Logged out: center the brand -->
+  <a class="navbar-brand fw-bold position-absolute start-50 translate-middle-x" href="login.php">
+    🚗 Car Service Tracker
+  </a>
+<?php endif; ?>
+
+
+    <!-- Toggler on the left (mobile) -->
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
+            aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
 
+    <!-- Collapsible content -->
     <div class="collapse navbar-collapse" id="mainNav">
+      <!-- Left: app links (only when logged in) -->
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
         <?php $loggedIn = !empty($_SESSION['user']); ?>
         <?php if ($loggedIn): ?>
@@ -57,13 +72,11 @@ if ($currentPhoto && preg_match('/^[a-z0-9._-]+$/i', $currentPhoto)) {
           <li class="nav-item">
             <a class="nav-link <?=($currentPage=='service_form.php'?'active':'')?>" href="service_form.php">Add Service</a>
           </li>
-        <?php else: ?>
-          <li class="nav-item"><a class="nav-link" href="login.php">Login</a></li>
-          <li class="nav-item"><a class="nav-link" href="register.php">Register</a></li>
         <?php endif; ?>
       </ul>
 
-      <div class="d-flex">
+      <!-- Right: auth area (buttons when logged out, profile/logout when logged in) -->
+      <div class="ms-auto d-flex">
         <?php if ($loggedIn): ?>
           <a class="btn btn-outline-primary btn-sm me-2 <?=($currentPage=='profile.php'?'active':'')?>" href="profile.php">
             <img src="<?= htmlspecialchars($navPhotoUrl) ?>" alt="Profile" class="rounded-circle me-1" style="width:24px;height:24px;object-fit:cover;">
@@ -71,12 +84,15 @@ if ($currentPhoto && preg_match('/^[a-z0-9._-]+$/i', $currentPhoto)) {
           </a>
           <a class="btn btn-outline-secondary btn-sm" href="logout.php">Logout</a>
         <?php else: ?>
-          <a class="btn btn-primary btn-sm" href="login.php">Login</a>
+          <a class="btn btn-primary btn-sm me-2" href="login.php">Login</a>
+          <a class="btn btn-outline-secondary btn-sm" href="register.php">Register</a>
         <?php endif; ?>
       </div>
     </div>
+
   </div>
 </nav>
+
 
 <!-- Open the page content container (footer will close it) -->
 <div class="container flex-fill">
