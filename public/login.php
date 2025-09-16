@@ -33,9 +33,15 @@ include __DIR__ . '/../templates/header.php';
   <div class="w-100" style="max-width:400px;">
     <h2 class="mb-4 text-center">Login</h2>
 
+    <?php if (isset($_GET['reset'])): ?>
+      <div class="alert alert-success">Password reset successful. Please log in.</div>
+    <?php endif; ?>
+
+
     <?php if (isset($_GET['registered'])): ?>
       <div class="alert alert-success text-center">Registration successful. Please log in.</div>
     <?php endif; ?>
+
     <?php if ($error): ?>
       <div class="alert alert-danger text-center"><?= $error ?></div>
     <?php endif; ?>

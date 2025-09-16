@@ -9,7 +9,6 @@ $DB_PASS = '';         // default is empty for XAMPP
 // Base URL of your app (adjust if your folder is different)
 define('BASE_URL', 'http://localhost/car-service-tracker');
 
-
 $BASE_URL = '/car-service-tracker/public'; // adjust if different
 
 // File uploads

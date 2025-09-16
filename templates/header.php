@@ -27,8 +27,22 @@ if ($currentPhoto && preg_match('/^[a-z0-9._-]+$/i', $currentPhoto)) {
 
 <?php $currentPage = basename($_SERVER['PHP_SELF']); ?>
 
+<?php $loggedIn = !empty($_SESSION['user']); ?>
+
+
 <nav class="navbar navbar-expand-lg bg-light border-bottom">
   <div class="container position-relative">
+
+  <!-- Toggler on the left (mobile) -->
+    <?php if ($loggedIn): ?>
+  <!-- Drawer (offcanvas) toggler: visible only when logged in -->
+  <button class="btn btn-outline-secondary me-3 d-lg-inline-flex" type="button"
+        data-bs-toggle="offcanvas" data-bs-target="#appDrawer" aria-controls="appDrawer"
+        title="Menu" aria-label="Open menu">
+  <span class="navbar-toggler-icon"></span>
+</button>
+
+<?php endif; ?>
 
     <!-- Brand centered -->
    <?php if (!empty($_SESSION['user'])): ?>
@@ -42,17 +56,12 @@ if ($currentPhoto && preg_match('/^[a-z0-9._-]+$/i', $currentPhoto)) {
 <?php endif; ?>
 
 
-    <!-- Toggler on the left (mobile) -->
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
-            aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
-    </button>
+  
 
     <!-- Collapsible content -->
-    <div class="collapse navbar-collapse" id="mainNav">
+    <div class="d-flex flex-grow-1">
       <!-- Left: app links (only when logged in) -->
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-        <?php $loggedIn = !empty($_SESSION['user']); ?>
         <?php if ($loggedIn): ?>
           <li class="nav-item">
             <a class="nav-link <?=($currentPage=='dashboard.php'?'active':'')?>" href="dashboard.php">Dashboard</a>
@@ -67,10 +76,7 @@ if ($currentPhoto && preg_match('/^[a-z0-9._-]+$/i', $currentPhoto)) {
             <a class="nav-link <?=($currentPage=='predictions.php'?'active':'')?>" href="predictions.php">Predictions</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link <?=($currentPage=='vehicle_form.php'?'active':'')?>" href="vehicle_form.php">Add Vehicle</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link <?=($currentPage=='service_form.php'?'active':'')?>" href="service_form.php">Add Service</a>
+            <a class="nav-link <?=($currentPage=='fuel_insights.php'?'active':'')?>" href="fuel_insights.php">Fuel Insights</a>
           </li>
         <?php endif; ?>
       </ul>
@@ -89,9 +95,29 @@ if ($currentPhoto && preg_match('/^[a-z0-9._-]+$/i', $currentPhoto)) {
         <?php endif; ?>
       </div>
     </div>
-
   </div>
 </nav>
+
+<?php if ($loggedIn): ?>
+  <div class="offcanvas offcanvas-start" tabindex="-1" id="appDrawer" aria-labelledby="appDrawerLabel">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title" id="appDrawerLabel">🚗 Car Service Tracker</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+      <div class="list-group list-group-flush">
+        <a href="dashboard.php"       class="list-group-item list-group-item-action <?= ($currentPage=='dashboard.php'?'active':'') ?>">🏠 Dashboard</a>
+        <a href="vehicle_form.php"        class="list-group-item list-group-item-action <?= ($currentPage=='vehicle_form.php'?'active':'') ?>">🚙 Add Vehicle</a>
+        <a href="service_form.php"        class="list-group-item list-group-item-action <?= ($currentPage=='service_form.php'?'active':'') ?>">🧰 Add Service Record</a>
+        <a href="fuel_form.php"            class="list-group-item list-group-item-action <?= ($currentPage=='fuel_form.php'?'active':'') ?>">⛽ Add Fuel Record</a>
+        <div class="mt-3 border-top pt-3"></div>
+        <a href="profile.php"         class="list-group-item list-group-item-action <?= ($currentPage=='profile.php'?'active':'') ?>">👤 Profile</a>
+        <a href="logout.php"          class="list-group-item list-group-item-action">🚪 Logout</a>
+      </div>
+    </div>
+  </div>
+<?php endif; ?>
+
 
 
 <!-- Open the page content container (footer will close it) -->
