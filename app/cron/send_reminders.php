@@ -5,11 +5,12 @@
 require_once __DIR__ . '/../../app/db.php';
 require_once __DIR__ . '/../../app/config.php';
 require_once __DIR__ . '/../../app/mail.php';
+require_once __DIR__ . '/../../app/sms.php'; // <-- NEW (Step 4)
 
 date_default_timezone_set('Asia/Dhaka');
 
 // === Config (edit if you like) ===
-$REMINDER_LOOKBACK_DAYS = 0; // re-send every run (no cooldown)
+$REMINDER_LOOKBACK_DAYS = 0; // re-send every run (no email cooldown)
 
 // Default rules for service "types" in your dropdown (km OR days)
 $RULES = [
@@ -68,8 +69,8 @@ function km_or_days_due(?int $sinceKm, ?int $sinceDays, int $limitKm, int $limit
   return $kmDue || $timeDue;
 }
 
-// ---- fetch verified users ----
-$users = db()->query("SELECT id, name, email FROM users WHERE email_verified=1")->fetchAll();
+// ---- fetch verified users (ADD phone + sms_opt_in for SMS) ----
+$users = db()->query("SELECT id, name, email, phone_number, sms_opt_in FROM users WHERE email_verified=1")->fetchAll();
 if (!$users) {
   echo "[info] no verified users.\n";
   exit(0);
@@ -77,6 +78,7 @@ if (!$users) {
 
 $today = new DateTime();
 $totalEmails = 0;
+$totalSms = 0;
 
 foreach ($users as $u) {
   $userId = (int)$u['id'];
@@ -116,7 +118,7 @@ foreach ($users as $u) {
 
       if (km_or_days_due($sinceKm, $sinceDays, $rule['km'], $rule['days'])) {
         if (!already_sent_recently($userId, $vehicleId, $ruleKey, $REMINDER_LOOKBACK_DAYS)) {
-          // SAFE subject line (ASCII hyphen)
+          // EMAIL (existing)
           $subject = "Engine oil change due - {$reg}";
           $html = "<p>Hi ".htmlspecialchars($u['name']).",</p>
                    <p><strong>{$reg}</strong> is due for an <strong>Engine oil change</strong>.</p>
@@ -136,10 +138,38 @@ foreach ($users as $u) {
           } else {
             echo "[mail error] {$u['email']} {$reg} engine_oil: {$sent}\n";
           }
+
+// SMS (safe + debuggable)
+$userForSms = [
+  'id' => (int)$u['id'],
+  'phone_number' => $u['phone_number'] ?? '',
+  'sms_opt_in' => (int)($u['sms_opt_in'] ?? 0),
+];
+$serviceNameForSms = 'Engine oil change';
+$smsMsg = "Overdue: {$serviceNameForSms} for {$reg}. Please service ASAP.";
+
+if (empty($userForSms['sms_opt_in']) || empty($userForSms['phone_number'])) {
+  echo "[sms skip] {$reg} engine_oil (no phone/opt-in)\n";
+} elseif (sms_already_sent_recently($userForSms['id'], $vehicleId, $serviceNameForSms)) {
+  echo "[sms skip] {$reg} engine_oil (throttled 24h)\n";
+} else {
+  try {
+    if (send_overdue_sms_if_allowed($userForSms, $vehicleId, $serviceNameForSms, $smsMsg)) {
+      $totalSms++;
+      echo "[sms] {$reg} engine_oil sent\n";
+    } else {
+      echo "[sms fail] {$reg} engine_oil (provider rejected; see sms_logs.provider_response)\n";
+    }
+  } catch (Throwable $e) {
+    echo "[sms error] {$reg} engine_oil: ".$e->getMessage()."\n";
+  }
+}
+
+
         }
       }
     }
-    // If no oil change ever recorded, we skip emailing to avoid noise.
+    // If no oil change ever recorded, we skip emailing/SMS to avoid noise.
 
     // 2) General rules for every other service type in $RULES
     foreach ($RULES as $type => $rule) {
@@ -153,7 +183,7 @@ foreach ($users as $u) {
       ");
       $st->execute([$vehicleId, $type]);
       $row = $st->fetch();
-      if (!$row) continue; // no record yet → don't email
+      if (!$row) continue; // no record yet → don't notify
 
       $lastMileage = (int)$row['mileage'];
       $lastDate    = new DateTime($row['service_date']);
@@ -164,7 +194,7 @@ foreach ($users as $u) {
 
       if (km_or_days_due($sinceKm, $sinceDays, $rule['km'], $rule['days'])) {
         if (!already_sent_recently($userId, $vehicleId, $ruleKey, $REMINDER_LOOKBACK_DAYS)) {
-          // SAFE subject line (ASCII hyphen)
+          // EMAIL
           $subject = "{$type} due - {$reg}";
           $html = "<p>Hi ".htmlspecialchars($u['name']).",</p>
                    <p><strong>{$reg}</strong> is due for <strong>".htmlspecialchars($type)."</strong>.</p>
@@ -183,10 +213,38 @@ foreach ($users as $u) {
           } else {
             echo "[mail error] {$u['email']} {$reg} {$ruleKey}: {$sent}\n";
           }
-        }
+          
+
+         // SMS (use actual type + ruleKey, with reasons)
+$userForSms = [
+  'id' => (int)$u['id'],
+  'phone_number' => $u['phone_number'] ?? '',
+  'sms_opt_in' => (int)($u['sms_opt_in'] ?? 0),
+];
+$serviceNameForSms = $type; // e.g. "Air filter change"
+$smsMsg = "Overdue: {$serviceNameForSms} for {$reg}. Please service ASAP.";
+
+if (empty($userForSms['sms_opt_in']) || empty($userForSms['phone_number'])) {
+  echo "[sms skip] {$reg} {$ruleKey} (no phone/opt-in)\n";
+} elseif (sms_already_sent_recently($userForSms['id'], $vehicleId, $serviceNameForSms)) {
+  echo "[sms skip] {$reg} {$ruleKey} (throttled 24h)\n";
+} else {
+  try {
+    if (send_overdue_sms_if_allowed($userForSms, $vehicleId, $serviceNameForSms, $smsMsg)) {
+      $totalSms++;
+      echo "[sms] {$reg} {$ruleKey} sent\n";
+    } else {
+      echo "[sms fail] {$reg} {$ruleKey} (provider rejected; see sms_logs.provider_response)\n";
+    }
+  } catch (Throwable $e) {
+    echo "[sms error] {$reg} {$ruleKey}: ".$e->getMessage()."\n";
+  }
+}
+
       }
     }
   }
 }
+}
 
-echo "[done] total emails sent: {$totalEmails}\n";
+echo "[done] total emails sent: {$totalEmails}, total SMS sent: {$totalSms}\n";

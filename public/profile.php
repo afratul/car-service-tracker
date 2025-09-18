@@ -8,6 +8,14 @@ require_login();
 $user = current_user(); // id, name, email, role, etc.
 $currentPhoto = $user['profile_photo'] ?? null; // DB stores just the filename (or null)
 
+// Ensure phone fields are available even if current_user() doesn't include them
+$uStmt = db()->prepare("SELECT phone_number, sms_opt_in FROM users WHERE id=?");
+$uStmt->execute([$user['id']]);
+$uExtra = $uStmt->fetch();
+if ($uExtra) {
+    $user['phone_number'] = $uExtra['phone_number'] ?? '';
+    $user['sms_opt_in']   = (int)($uExtra['sms_opt_in'] ?? 0);
+}
 
 $success = '';
 $errors  = [];
@@ -22,6 +30,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $curr    = $_POST['current_password'] ?? '';
     $new1    = $_POST['new_password'] ?? '';
     $new2    = $_POST['confirm_password'] ?? '';
+    // 0) Phone & SMS (optional fields)
+$phone    = trim($_POST['phone_number'] ?? '');
+$smsOptIn = isset($_POST['sms_opt_in']) ? 1 : 0;
+
+// Basic phone validation (E.164-ish). Empty is allowed.
+if ($phone !== '' && !preg_match('/^\+?[0-9]{8,15}$/', $phone)) {
+    $errors[] = 'Enter a valid phone number in international format (e.g., +8801XXXXXXXXX).';
+}
+
 
     // 1) Update name (optional)
     if ($newName === '') {
@@ -85,9 +102,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // If any errors occurred during upload, do not update DB yet
     if (!$errors) {
         // update name
-        $stmt = db()->prepare("UPDATE users SET name=? WHERE id=?");
-        $stmt->execute([$newName, $user['id']]);
+        // update name + phone + sms opt-in
+        $stmt = db()->prepare("UPDATE users SET name=?, phone_number=?, sms_opt_in=? WHERE id=?");
+        $stmt->execute([$newName, $phone, $smsOptIn, $user['id']]);
         $user['name'] = $newName;
+        $user['phone_number'] = $phone;
+        $user['sms_opt_in'] = $smsOptIn;
 
         // update password if requested
         if ($changePw && $curr !== '' && $new1 !== '' && $new1 === $new2) {
@@ -113,6 +133,10 @@ $_SESSION['user']['name'] = $newName;
 if ($newPhotoFilename) {
     $_SESSION['user']['profile_photo'] = $newPhotoFilename;
 }
+
+$_SESSION['user']['phone_number'] = $phone;
+$_SESSION['user']['sms_opt_in']   = $smsOptIn;
+
 
 
         $success = 'Profile updated successfully.';
@@ -175,6 +199,22 @@ include __DIR__ . '/../templates/header.php';
     <label class="form-label">Name</label>
     <input name="name" class="form-control" value="<?= htmlspecialchars($user['name']) ?>" required>
   </div>
+  <div class="mb-3">
+  <label class="form-label">Phone number (for SMS alerts)</label>
+  <input name="phone_number" class="form-control"
+         value="<?= htmlspecialchars($user['phone_number'] ?? '') ?>"
+         placeholder="+8801XXXXXXXXX">
+  <div class="form-text">Use international format (E.164), e.g., +8801…</div>
+</div>
+
+<div class="form-check mb-3">
+  <input class="form-check-input" type="checkbox" name="sms_opt_in" id="sms_opt_in" value="1"
+         <?= !empty($user['sms_opt_in']) ? 'checked' : '' ?>>
+  <label class="form-check-label" for="sms_opt_in">
+    Receive SMS alerts for overdue services
+  </label>
+</div>
+
 </div>
 
 

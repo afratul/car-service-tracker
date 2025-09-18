@@ -32,3 +32,72 @@
 [sent] afratul2002@gmail.com DHAKA METRO-GA-42-5597 engine_oil
 [sent] afratul2002@gmail.com DHAKA METRO-GA-42-5597 engine_coolant_check
 [done] total emails sent: 2
+[sent] afratul2002@gmail.com DHAKA METRO-GA-42-5597 engine_oil
+PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in C:\xampp\htdocs\car-service-tracker\app\sms.php:50
+Stack trace:
+#0 C:\xampp\htdocs\car-service-tracker\app\sms.php(50): PDOStatement->execute(Array)
+#1 C:\xampp\htdocs\car-service-tracker\app\sms.php(59): log_sms(1, 2, 'Engine oil chan...', 'Overdue: Engine...', 'failed', '{"success":fals...')
+#2 C:\xampp\htdocs\car-service-tracker\app\cron\send_reminders.php(149): send_overdue_sms_if_allowed(Array, 2, 'Engine oil chan...', 'Overdue: Engine...')
+#3 {main}
+  thrown in C:\xampp\htdocs\car-service-tracker\app\sms.php on line 50
+
+Fatal error: Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in C:\xampp\htdocs\car-service-tracker\app\sms.php:50
+Stack trace:
+#0 C:\xampp\htdocs\car-service-tracker\app\sms.php(50): PDOStatement->execute(Array)
+#1 C:\xampp\htdocs\car-service-tracker\app\sms.php(59): log_sms(1, 2, 'Engine oil chan...', 'Overdue: Engine...', 'failed', '{"success":fals...')
+#2 C:\xampp\htdocs\car-service-tracker\app\cron\send_reminders.php(149): send_overdue_sms_if_allowed(Array, 2, 'Engine oil chan...', 'Overdue: Engine...')
+#3 {main}
+  thrown in C:\xampp\htdocs\car-service-tracker\app\sms.php on line 50
+[sent] afratul2002@gmail.com DHAKA METRO-GA-42-5597 engine_oil
+PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in C:\xampp\htdocs\car-service-tracker\app\sms.php:50
+Stack trace:
+#0 C:\xampp\htdocs\car-service-tracker\app\sms.php(50): PDOStatement->execute(Array)
+#1 C:\xampp\htdocs\car-service-tracker\app\sms.php(59): log_sms(1, 2, 'Engine oil chan...', 'Overdue: Engine...', 'failed', '{"success":fals...')
+#2 C:\xampp\htdocs\car-service-tracker\app\cron\send_reminders.php(149): send_overdue_sms_if_allowed(Array, 2, 'Engine oil chan...', 'Overdue: Engine...')
+#3 {main}
+  thrown in C:\xampp\htdocs\car-service-tracker\app\sms.php on line 50
+
+Fatal error: Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in C:\xampp\htdocs\car-service-tracker\app\sms.php:50
+Stack trace:
+#0 C:\xampp\htdocs\car-service-tracker\app\sms.php(50): PDOStatement->execute(Array)
+#1 C:\xampp\htdocs\car-service-tracker\app\sms.php(59): log_sms(1, 2, 'Engine oil chan...', 'Overdue: Engine...', 'failed', '{"success":fals...')
+#2 C:\xampp\htdocs\car-service-tracker\app\cron\send_reminders.php(149): send_overdue_sms_if_allowed(Array, 2, 'Engine oil chan...', 'Overdue: Engine...')
+#3 {main}
+  thrown in C:\xampp\htdocs\car-service-tracker\app\sms.php on line 50
+[sent] afratul2002@gmail.com DHAKA METRO-GA-42-5597 engine_oil
+[sent] afratul2002@gmail.com DHAKA METRO-GA-42-5597 engine_coolant_check
+[done] total emails sent: 2, total SMS sent: 0
+[sent] afratul2002@gmail.com DHAKA METRO-GA-42-5597 engine_oil
+[sent] afratul2002@gmail.com DHAKA METRO-GA-42-5597 engine_coolant_check
+[done] total emails sent: 2, total SMS sent: 0
+[sent] afratul2002@gmail.com DHAKA METRO-GA-42-5597 engine_oil
+[sent] afratul2002@gmail.com DHAKA METRO-GA-42-5597 engine_coolant_check
+[done] total emails sent: 2, total SMS sent: 0
+[sent] afratul2002@gmail.com DHAKA METRO-GA-42-5597 engine_oil
+[sms fail] DHAKA METRO-GA-42-5597 engine_oil (provider rejected; see sms_logs.provider_response)
+[sent] afratul2002@gmail.com DHAKA METRO-GA-42-5597 engine_coolant_check
+[sms fail] DHAKA METRO-GA-42-5597 engine_coolant_check (provider rejected; see sms_logs.provider_response)
+[done] total emails sent: 2, total SMS sent: 0
+[sent] afratul2002@gmail.com DHAKA METRO-GA-42-5597 engine_oil
+[sms fail] DHAKA METRO-GA-42-5597 engine_oil (provider rejected; see sms_logs.provider_response)
+[sent] afratul2002@gmail.com DHAKA METRO-GA-42-5597 engine_coolant_check
+[sms fail] DHAKA METRO-GA-42-5597 engine_coolant_check (provider rejected; see sms_logs.provider_response)
+[done] total emails sent: 2, total SMS sent: 0
+PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY000] [2002] No connection could be made because the target machine actively refused it in C:\xampp\htdocs\car-service-tracker\app\db.php:9
+Stack trace:
+#0 C:\xampp\htdocs\car-service-tracker\app\db.php(9): PDO->__construct('mysql:host=127....', 'root', Object(SensitiveParameterValue), Array)
+#1 C:\xampp\htdocs\car-service-tracker\app\cron\send_reminders.php(73): db()
+#2 {main}
+  thrown in C:\xampp\htdocs\car-service-tracker\app\db.php on line 9
+
+Fatal error: Uncaught PDOException: SQLSTATE[HY000] [2002] No connection could be made because the target machine actively refused it in C:\xampp\htdocs\car-service-tracker\app\db.php:9
+Stack trace:
+#0 C:\xampp\htdocs\car-service-tracker\app\db.php(9): PDO->__construct('mysql:host=127....', 'root', Object(SensitiveParameterValue), Array)
+#1 C:\xampp\htdocs\car-service-tracker\app\cron\send_reminders.php(73): db()
+#2 {main}
+  thrown in C:\xampp\htdocs\car-service-tracker\app\db.php on line 9
+[sent] afratul2002@gmail.com DHAKA METRO-GA-42-5597 engine_oil
+[sms] DHAKA METRO-GA-42-5597 engine_oil sent
+[sent] afratul2002@gmail.com DHAKA METRO-GA-42-5597 engine_coolant_check
+[sms] DHAKA METRO-GA-42-5597 engine_coolant_check sent
+[done] total emails sent: 2, total SMS sent: 2

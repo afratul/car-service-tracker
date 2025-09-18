@@ -9,6 +9,12 @@ $DB_PASS = '';         // default is empty for XAMPP
 // Base URL of your app (adjust if your folder is different)
 define('BASE_URL', 'http://localhost/car-service-tracker');
 
+// --- SMS via BulkSMSBD ---
+define('BULKSMSBD_API_KEY',   getenv('BULKSMSBD_API_KEY')   ?: '4coS9g4aVf3ZVe4aCBny');
+define('BULKSMSBD_SENDER_ID', getenv('BULKSMSBD_SENDER_ID') ?: '8809617629068');
+define('BULKSMSBD_ENDPOINT',  'http://bulksmsbd.net/api/smsapi');
+
+
 $BASE_URL = '/car-service-tracker/public'; // adjust if different
 
 // File uploads
