@@ -117,7 +117,20 @@ include __DIR__ . '/../templates/header.php';
 ?>
 
 <style>
-  /* clamp the notes preview to 1 line, very short */
+  /* Use fixed layout so widths are respected */
+  .table-fixed { table-layout: fixed; width: 100%; }
+
+  /* Number cells: keep compact and aligned */
+  .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  /* Single-line truncation with ellipsis */
+  .td-trunc {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Notes preview: keep very short */
   .note-preview{
     display: -webkit-box;
     -webkit-line-clamp: 1;
@@ -125,9 +138,13 @@ include __DIR__ . '/../templates/header.php';
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-    max-width: 200px;  /* was 400px before, now smaller */
+    max-width: 100%;
   }
+
+  /* Give the actions column a little breathing room */
+  td.actions .btn { vertical-align: middle; }
 </style>
+
 
 
 <div class="d-flex justify-content-between align-items-center">
@@ -197,7 +214,17 @@ include __DIR__ . '/../templates/header.php';
   }
 ?>
 
-<table class="table table-striped mt-3">
+<table class="table table-striped mt-3 table-fixed">
+  <colgroup>
+    <col style="width:90px;">  <!-- Date -->
+    <col style="width:180px;">  <!-- Vehicle -->
+    <col style="width:180px;">  <!-- Type -->
+    <col style="width:80px;">  <!-- Mileage -->
+    <col style="width:80px;">  <!-- Cost -->
+    <col style="width:150px;">  <!-- Service Center -->
+    <col style="width:50px;">  <!-- Notes -->
+    <col style="width:120px;">  <!-- Actions -->
+  </colgroup>
   <thead>
   <tr>
     <th>
@@ -215,18 +242,26 @@ include __DIR__ . '/../templates/header.php';
         Type<?= sortArrow('type', $sort, $dir) ?>
       </a>
     </th>
-    <th class="text-end">
-      <a class="text-decoration-none" href="<?= sortUrl('mileage', $sort, $dir, $qsSort) ?>">
-        Mileage<?= sortArrow('mileage', $sort, $dir) ?>
-      </a>
-    </th>
-    <th class="text-end">
-      <a class="text-decoration-none" href="<?= sortUrl('cost', $sort, $dir, $qsSort) ?>">
-        Cost<?= sortArrow('cost', $sort, $dir) ?>
-      </a>
-    </th>
-    <th>Notes</th>
-    <th></th>
+
+    <th class="num">
+  <a class="text-decoration-none" href="<?= sortUrl('mileage', $sort, $dir, $qsSort) ?>">
+    Mileage<?= sortArrow('mileage', $sort, $dir) ?>
+  </a>
+</th>
+<th class="num">
+  <a class="text-decoration-none" href="<?= sortUrl('cost', $sort, $dir, $qsSort) ?>">
+    Cost<?= sortArrow('cost', $sort, $dir) ?>
+  </a>
+</th>
+  </th>
+      <th class="text-center">
+      Service Center
+      </th>
+
+  <th>
+    Notes
+  </th>
+  <th></th>
   </tr>
 </thead>
 
@@ -241,23 +276,27 @@ include __DIR__ . '/../templates/header.php';
           <span class="badge bg-secondary ms-1"><?=htmlspecialchars($r['oil_type'])?></span>
         <?php endif; ?>
       </td>
-      <td><?=number_format($r['mileage'])?></td>
-      <td><?=number_format((float)$r['cost'], 2)?></td>
-      <td>
-        <?php
-          $note = $r['notes'] ?? '';
-          $isLong = (mb_strlen($note, 'UTF-8') > 100); // decide when to show "View"
-        ?>
-        <div class="note-preview"><?= nl2br(htmlspecialchars($note)) ?></div>
-        <?php if ($isLong): ?>
-          <button type="button"
-                  class="btn btn-sm btn-outline-primary ms-2"
-                  data-bs-toggle="modal"
-                  data-bs-target="#noteModal-<?= (int)$r['id'] ?>">
-            View
-          </button>
-        <?php endif; ?>
-      </td>
+      <td class="num"><?= number_format((int)$r['mileage']) ?></td>
+
+<td class="num"><?= number_format((float)$r['cost'], 2) ?></td>
+
+<td class="text-center" ><?= htmlspecialchars($r['service_center'] ?? '') ?></td>
+
+     <td class="text-center">
+  <?php
+    $note = $r['notes'] ?? '';
+    $isLong = (mb_strlen($note, 'UTF-8') > 0);
+  ?>
+  <?php if ($isLong): ?>
+    <button type="button"
+            class="btn btn-sm btn-outline-primary"
+            data-bs-toggle="modal"
+            data-bs-target="#noteModal-<?= (int)$r['id'] ?>">
+      View
+    </button>
+  <?php endif; ?>
+</td>
+
       <td class="text-end">
         <a class="btn btn-sm btn-outline-secondary me-2" href="service_form.php?id=<?=$r['id']?>">Edit</a>
 <form method="post" class="d-inline" onsubmit="return confirm('Delete this record?');">

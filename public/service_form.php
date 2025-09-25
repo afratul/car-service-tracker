@@ -60,13 +60,14 @@ if (!$vehicles) { header('Location: vehicle_form.php'); exit; }
 
 $errors = [];
 $service = [
-  'vehicle_id'   => $vehicles[0]['id'],
-  'service_date' => date('Y-m-d'),
-  'type'         => '',
-  'mileage'      => 0,
-  'cost'         => '0.00',
-  'notes'        => '',
-  'oil_type'     => ''   // only used when Type = Engine oil change
+  'vehicle_id'      => $vehicles[0]['id'],
+  'service_date'    => date('Y-m-d'),
+  'type'            => '',
+  'mileage'         => 0,
+  'cost'            => '0.00',
+  'notes'           => '',
+  'oil_type'        => '',   // only used when Type = Engine oil change
+  'service_center'  => ''
 
 ];
 
@@ -120,6 +121,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $service['cost']         = (string)($_POST['cost'] ?? '0');
   $service['notes']        = trim($_POST['notes'] ?? '');
   $service['oil_type']     = trim($_POST['oil_type'] ?? '');
+  $service['service_center'] = trim($_POST['service_center'] ?? '');
+if (mb_strlen($service['service_center']) > 255) {
+    $errors[] = 'Service center name is too long (max 255).';
+}
+
 
 
   // ensure the selected vehicle belongs to this user
@@ -185,8 +191,8 @@ if ($service['type'] === 'Other' && $service['notes'] === '') {
   if (!$errors) {
   if ($id) {
     $sql = "UPDATE services 
-        SET vehicle_id=?, service_date=?, type=?, oil_type=?, mileage=?, cost=?, notes=? 
-        WHERE id=?";
+    SET vehicle_id=?, service_date=?, type=?, oil_type=?, mileage=?, cost=?, notes=?, service_center=?
+    WHERE id=?";
 db()->prepare($sql)->execute([
   $service['vehicle_id'],
   $service['service_date'],
@@ -195,12 +201,14 @@ db()->prepare($sql)->execute([
   $service['mileage'],
   $service['cost'],
   $service['notes'],
+  $service['service_center'], 
   $id
 ]);
 
+
   } else {
-    $sql = "INSERT INTO services (vehicle_id, service_date, type, oil_type, mileage, cost, notes)
-        VALUES (?,?,?,?,?,?,?)";
+    $sql = "INSERT INTO services (vehicle_id, service_date, type, oil_type, mileage, cost, notes, service_center)
+        VALUES (?,?,?,?,?,?,?,?)";
 db()->prepare($sql)->execute([
   $service['vehicle_id'],
   $service['service_date'],
@@ -208,8 +216,10 @@ db()->prepare($sql)->execute([
   ($service['type'] === 'Engine oil change' ? $service['oil_type'] : null),
   $service['mileage'],
   $service['cost'],
-  $service['notes']
+  $service['notes'],
+  $service['service_center']   
 ]);
+
 
   }
 
@@ -282,6 +292,17 @@ include __DIR__ . '/../templates/header.php';
     <label class="form-label">Cost</label>
     <input type="number" step="0.01" class="form-control" name="cost" value="<?=htmlspecialchars($service['cost'])?>" required>
   </div>
+  <div class="col-md-6">
+  <label class="form-label">Service center</label>
+  <input type="text"
+         name="service_center"
+         class="form-control"
+         maxlength="255"
+         placeholder="e.g., Rahim Auto Care, Dhanmondi"
+         value="<?= htmlspecialchars($service['service_center'] ?? '') ?>">
+  <div class="form-text">Where you took the service (optional).</div>
+</div>
+
   <div class="col-md-8">
     <label class="form-label">Notes (optional)</label>
     <textarea class="form-control" name="notes" rows="2"><?=htmlspecialchars($service['notes'])?></textarea>

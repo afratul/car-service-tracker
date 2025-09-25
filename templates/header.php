@@ -21,6 +21,11 @@ if ($currentPhoto && preg_match('/^[a-z0-9._-]+$/i', $currentPhoto)) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Car Service Tracker</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+  /* Right-align numbers and use fixed-width digits for prettier columns */
+  .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+</style>
+
 </head>
 <body class="d-flex flex-column min-vh-100">
 
@@ -82,18 +87,26 @@ if ($currentPhoto && preg_match('/^[a-z0-9._-]+$/i', $currentPhoto)) {
       </ul>
 
       <!-- Right: auth area (buttons when logged out, profile/logout when logged in) -->
-      <div class="ms-auto d-flex">
-        <?php if ($loggedIn): ?>
-          <a class="btn btn-outline-primary btn-sm me-2 <?=($currentPage=='profile.php'?'active':'')?>" href="profile.php">
-            <img src="<?= htmlspecialchars($navPhotoUrl) ?>" alt="Profile" class="rounded-circle me-1" style="width:24px;height:24px;object-fit:cover;">
-            Profile
-          </a>
-          <a class="btn btn-outline-secondary btn-sm" href="logout.php">Logout</a>
-        <?php else: ?>
-          <a class="btn btn-primary btn-sm me-2" href="login.php">Login</a>
-          <a class="btn btn-outline-secondary btn-sm" href="register.php">Register</a>
-        <?php endif; ?>
-      </div>
+      <div class="ms-auto">
+  <?php if ($loggedIn): ?>
+    <div class="dropdown">
+      <a class="d-flex align-items-center text-decoration-none dropdown-toggle" href="#" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+  <img src="<?= htmlspecialchars($navPhotoUrl) ?>" alt="Profile" class="rounded-circle me-2" style="width:32px;height:32px;object-fit:cover;">
+  <span class="d-none d-sm-inline"><?= htmlspecialchars($user['name']) ?></span>
+</a>
+
+      <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+        <li><a class="dropdown-item <?=($currentPage=='profile.php'?'active':'')?>" href="profile.php">👤 Profile</a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item" href="logout.php">🚪 Logout</a></li>
+      </ul>
+    </div>
+  <?php else: ?>
+    <a class="btn btn-primary btn-sm me-2" href="login.php">Login</a>
+    <a class="btn btn-outline-secondary btn-sm" href="register.php">Register</a>
+  <?php endif; ?>
+</div>
+
     </div>
   </div>
 </nav>

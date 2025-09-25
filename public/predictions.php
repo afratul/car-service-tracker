@@ -48,41 +48,60 @@ include __DIR__ . '/../templates/header.php';
           <a class="btn btn-sm btn-outline-primary" href="service_form.php?vehicle_id=<?= (int)$block['vehicle_id'] ?>">Log Service</a>
         </div>
 
-        <div class="table-responsive">
-          <table class="table table-striped align-middle m-0">
-            <thead>
-              <tr>
-                <th style="min-width:220px;">Service Type</th>
-                <th>Next Due (Mileage)</th>
-                <th>Km Remaining</th>
-                <th>Next Due (Date)</th>
-                <th>Days Remaining</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php foreach ($preds as $p): ?>
-                <tr>
-                  <td><?= htmlspecialchars($p['type']) ?></td>
-                  <td><?= $p['next_mileage'] !== null ? number_format((int)$p['next_mileage']) : '—' ?></td>
-                  <td><?= $p['km_remaining'] !== null ? number_format((int)$p['km_remaining']) : '—' ?></td>
-                  <td><?= fmt_date($p['next_date'] ?? null) ?></td>
-                  <td>
-                    <?php
-                      if ($p['days_remaining'] === null) {
-                        echo '—';
-                      } else {
-                        $dr = (int)$p['days_remaining'];
-                        echo ($dr >= 0 ? $dr : "<span class='text-danger'>{$dr}</span>");
-                      }
-                    ?>
-                  </td>
-                  <td><?= status_badge($p['km_remaining'], $p['days_remaining'], (bool)$p['is_due']) ?></td>
-                </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
-        </div>
+ <div class="table-responsive">
+  <table class="table table-striped align-middle m-0 table-fixed">
+    <thead>
+      <tr>
+        <th style="width:200px;">Service Type</th>
+        <th class="num" style="width:120px;">Next Due (Mileage)</th>
+        <th class="num" style="width:120px;">Km Remaining</th>
+        <th class="num" style="width:140px;">Next Due (Date)</th>
+        <th class="num" style="width:120px;">Days Remaining</th>
+        <th style="width:100px;">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <?php foreach ($preds as $p): ?>
+        <?php
+          $isDue   = !empty($p['is_due']);
+          $nextMil = ($p['next_mileage'] !== null) ? number_format((int)$p['next_mileage']) : '—';
+
+          if ($isDue) {
+            $kmRemOut   = '0';
+            $daysRemOut = '0';
+            $nextDateOut = '—';   // 🔹 hide next due date
+          } else {
+            $kmRemOut   = ($p['km_remaining']   !== null) ? number_format((int)max(0, (int)$p['km_remaining'])) : '—';
+            $daysRemOut = ($p['days_remaining'] !== null) ? (int)max(0, (int)$p['days_remaining']) : '—';
+            $nextDateOut = fmt_date($p['next_date'] ?? null);
+          }
+        ?>
+        <tr>
+          <td class="text-truncate"><?= htmlspecialchars($p['type']) ?></td>
+          <td class="num"><?= $nextMil ?></td>
+          <td class="num"><?= $kmRemOut ?></td>
+          <td class="num"><?= $nextDateOut ?></td> 
+          <td class="num"><?= $daysRemOut ?></td>
+          <td><?= status_badge($p['km_remaining'], $p['days_remaining'], $isDue) ?></td>
+        </tr>
+      <?php endforeach; ?>
+    </tbody>
+  </table>
+</div>
+
+<style>
+.table-fixed {
+  table-layout: fixed;
+  width: 100%;
+}
+.num {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+</style>
+
+
 
       </div>
     </div>
